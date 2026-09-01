@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>🧑‍🍳 Cocina — Tortas Tortuga</title>
+<link rel="icon" href="../favicon.ico">
+<script>
+// ── ACCESO SOLO STAFF ─────────────────────────────────────────
+// Si quien entra es un cliente (no empleado/cajero), lo mandamos a la
+// vista de solo lectura de su propio pedido, no a este tablero completo.
+(function() {
+    function leer(k){ return localStorage.getItem(k) || sessionStorage.getItem(k); }
+    var empId = leer('tt_emp_id');
+    var cajNombre = leer('tt_cajero_nombre');
+
+    // Basta con tener una sesión de staff activa (ya no expira por tiempo;
+    // se cierra al tocar "Salir" en el portal de empleados).
+    var esStaff = !!empId || !!cajNombre;
+
+    if (!esStaff) {
+        window.location.replace('mi-pedido.html');
+    }
+})();
+</script>
+<style>
+:root {
+  --bg:#0D0D0D; --surface:#1A1A1A; --surface2:#222;
+  --border:rgba(255,255,255,.1); --text:#fff; --muted:#888;
+  --orange:#FF5A00; --blue:#3B82F6; --green:#25D366;
+  --yellow:#FBB724; --red:#FF4444; --purple:#A78BFA;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',sans-serif;min-height:100vh;}
+
+/* Header */
+.header{background:#111;border-bottom:2px solid var(--orange);padding:.7rem 1rem;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;gap:.5rem;flex-wrap:wrap;}
+.logo{font-size:1rem;font-weight:900;color:var(--orange);}
+.stats{display:flex;gap:.75rem;}
+.stat{text-align:center;}
+.stat-val{font-size:1.3rem;font-weight:900;}
+.stat-lbl{font-size:.6rem;color:var(--muted);text-transform:uppercase;}
+.header-btns{display:flex;gap:.4rem;align-items:center;}
+.hbtn{background:rgba(255,255,255,.06);border:1px solid var(--border);
+  color:var(--muted);border-radius:8px;padding:.3rem .65rem;
+  font-family:inherit;font-size:.75rem;cursor:pointer;}
+
+/* Alert */
+#alert-banner{display:none;background:linear-gradient(135deg,var(--orange),#FF8800);
+  color:#fff;text-align:center;padding:.65rem;font-size:1rem;font-weight:800;
+  animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+
+/* Tabs */
+.tabs{display:flex;gap:0;background:#111;border-bottom:1px solid var(--border);}
+.tab{flex:1;padding:.6rem;text-align:center;font-size:.82rem;font-weight:700;
+  cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;transition:.15s;}
+.tab.active{color:var(--orange);border-bottom-color:var(--orange);}
+
+/* Grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:.85rem;padding:.85rem;}
+
+/* Card */
+.kcard{background:var(--surface);border:2px solid #333;border-radius:14px;overflow:hidden;animation:fadeIn .3s;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.kcard.nuevo  {border-color:var(--orange);box-shadow:0 0 18px rgba(255,90,0,.25);}
+.kcard.prep   {border-color:var(--blue);}
+.kcard.listo  {border-color:var(--green);}
+.kcard.entregado{border-color:#333;opacity:.75;}
+
+.kcard-head{padding:.6rem .9rem;display:flex;align-items:center;justify-content:space-between;}
+.kcard.nuevo   .kcard-head{background:rgba(255,90,0,.18);}
+.kcard.prep    .kcard-head{background:rgba(59,130,246,.18);}
+.kcard.listo   .kcard-head{background:rgba(37,211,102,.12);}
+.kcard.entregado .kcard-head{background:rgba(255,255,255,.04);}
+
+.kticket{font-size:1.5rem;font-weight:900;color:var(--yellow);}
+.kcliente{font-size:1.15rem;color:var(--text);font-weight:800;margin-top:.15rem;}
+.ktimer{font-size:1.1rem;font-weight:800;padding:.3rem .7rem;border-radius:20px;background:rgba(0,0,0,.35);}
+.ktimer.ok    {color:var(--green);}
+.ktimer.warn  {color:var(--yellow);}
+.ktimer.late  {color:var(--red);animation:pulse .8s infinite;}
+
+.kcard-items{padding:.75rem 1rem;border-top:1px solid var(--border);}
+.kitem{padding:.5rem 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:1.15rem;}
+.kitem:last-child{border-bottom:none;}
+.kitem-name{color:var(--text);font-weight:700;line-height:1.3;}
+.kitem-mods{font-size:1rem;color:var(--yellow);margin-top:.2rem;font-weight:700;}
+
+.kcard-actions{padding:.7rem 1rem;display:flex;gap:.5rem;border-top:1px solid var(--border);align-items:stretch;}
+.kbtn{flex:1;padding:.7rem;border-radius:8px;border:none;font-family:inherit;
+  font-size:1rem;font-weight:800;cursor:pointer;transition:.15s;}
+.kbtn-cook  {background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.5);color:var(--blue);}
+.kbtn-ready {background:rgba(37,211,102,.2);border:1px solid rgba(37,211,102,.5);color:var(--green);}
+.kbtn-done  {background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);}
+.kbtn-edit  {background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.4);color:var(--purple);}
+.kbtn-max   {flex:0 0 auto;background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
+  padding:.7rem .85rem;font-size:1.05rem;border-radius:8px;cursor:pointer;}
+
+/* ═══ MODO COMPACTO (minimizar para ver más órdenes) ═══ */
+body.compacto .grid{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.6rem;padding:.6rem;}
+body.compacto .kticket{font-size:1.1rem;}
+body.compacto .kcliente{font-size:.85rem;}
+body.compacto .ktimer{font-size:.85rem;padding:.2rem .5rem;}
+body.compacto .kitem{font-size:.85rem;padding:.3rem 0;}
+body.compacto .kitem-mods{font-size:.75rem;}
+body.compacto .kbtn{font-size:.8rem;padding:.5rem;}
+body.compacto .kcard-items{padding:.5rem .7rem;}
+
+/* ═══ TARJETA MAXIMIZADA (una orden a pantalla completa) ═══ */
+#max-overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9500;
+  display:none;align-items:center;justify-content:center;padding:1.5rem;}
+#max-overlay.open{display:flex;}
+#max-overlay .kcard{width:100%;max-width:600px;max-height:92vh;overflow-y:auto;border-width:3px;}
+#max-overlay .kticket{font-size:2.4rem;}
+#max-overlay .kcliente{font-size:1.7rem;}
+#max-overlay .ktimer{font-size:1.6rem;padding:.4rem 1rem;}
+#max-overlay .kitem{font-size:1.7rem;padding:.7rem 0;}
+#max-overlay .kitem-mods{font-size:1.35rem;}
+#max-overlay .kcard-head{padding:1rem 1.3rem;}
+#max-overlay .kcard-items{padding:1rem 1.3rem;}
+#max-close{position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,.1);
+  border:1px solid var(--border);color:#fff;border-radius:10px;padding:.6rem 1rem;
+  font-size:1.1rem;font-weight:800;cursor:pointer;font-family:inherit;z-index:9600;}
+
+/* Empty */
+.empty{text-align:center;padding:3.5rem;color:#333;grid-column:1/-1;}
+.empty-ico{font-size:3rem;}
+.empty-lbl{font-size:.9rem;color:#444;margin-top:.5rem;}
+
+/* ═══ MODAL EDITOR ═══ */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9000;
+  display:none;align-items:flex-end;justify-content:center;}
+.modal-ov.open{display:flex;}
+.modal{background:#1C1C1C;border:1px solid rgba(255,255,255,.12);
+  border-radius:20px 20px 0 0;width:100%;max-width:560px;
+  max-height:90vh;display:flex;flex-direction:column;}
+.modal-handle{width:32px;height:4px;background:rgba(255,255,255,.15);
+  border-radius:4px;margin:.8rem auto .4rem;flex-shrink:0;}
+.modal-head{padding:.5rem 1rem .75rem;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
+.modal-title{font-size:.95rem;font-weight:800;color:var(--orange);}
+.modal-close{background:none;border:1px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.25rem .6rem;cursor:pointer;font-size:.85rem;}
+.modal-body{flex:1;overflow-y:auto;padding:0 1rem 1rem;-webkit-overflow-scrolling:touch;}
+
+/* Editor items */
+.edit-item{background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:.7rem;margin-bottom:.5rem;}
+.edit-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem;}
+.edit-item-name{font-size:.85rem;font-weight:700;color:var(--text);}
+.edit-item-precio{font-size:.85rem;color:var(--green);font-weight:700;}
+.edit-mods-input{width:100%;background:#111;border:1px solid var(--border);
+  color:var(--text);border-radius:8px;padding:.4rem .65rem;
+  font-family:inherit;font-size:.78rem;margin-top:.3rem;}
+.edit-item-del{background:rgba(255,68,68,.15);border:1px solid rgba(255,68,68,.3);
+  color:var(--red);border-radius:6px;padding:.2rem .5rem;
+  font-size:.75rem;cursor:pointer;font-family:inherit;}
+
+/* Add item section */
+.add-section{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.2);
+  border-radius:10px;padding:.75rem;margin-top:.5rem;}
+.add-section-title{font-size:.78rem;color:var(--purple);font-weight:700;margin-bottom:.5rem;}
+.add-row{display:flex;gap:.4rem;}
+.add-input{flex:1;background:#111;border:1px solid var(--border);color:var(--text);
+  border-radius:8px;padding:.4rem .65rem;font-family:inherit;font-size:.78rem;}
+.add-btn{background:rgba(167,139,250,.2);border:1px solid rgba(167,139,250,.4);
+  color:var(--purple);border-radius:8px;padding:.4rem .75rem;
+  font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+/* Status buttons in editor */
+.status-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.4rem;margin:.65rem 0;}
+.status-opt{padding:.55rem;border-radius:8px;border:1.5px solid var(--border);
+  color:var(--muted);font-family:inherit;font-size:.78rem;font-weight:700;
+  cursor:pointer;text-align:center;transition:.15s;}
+.status-opt.selected{border-color:var(--orange);color:var(--orange);background:rgba(255,90,0,.1);}
+
+/* Save btn */
+.save-btn{width:100%;padding:.82rem;background:linear-gradient(135deg,var(--orange),#FF8800);
+  color:#fff;border:none;border-radius:11px;font-family:inherit;
+  font-size:.92rem;font-weight:800;cursor:pointer;margin-top:.65rem;}
+.cancel-btn{width:100%;padding:.68rem;background:transparent;
+  border:1px solid var(--border);color:var(--muted);
+  border-radius:11px;font-family:inherit;font-size:.85rem;cursor:pointer;margin-top:.4rem;}
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<div id="alert-banner">🔔 ¡NUEVA ORDEN!</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">🐢 Cocina <span id="mi-tortumovil" style="font-size:.7rem;color:#25D366;font-weight:700;"></span></div>
+  <div class="stats">
+    <div class="stat"><div class="stat-val" id="cnt-n" style="color:var(--orange)">0</div><div class="stat-lbl">Nuevas</div></div>
+    <div class="stat"><div class="stat-val" id="cnt-p" style="color:var(--blue)">0</div><div class="stat-lbl">Cocina</div></div>
+    <div class="stat"><div class="stat-val" id="cnt-l" style="color:var(--green)">0</div><div class="stat-lbl">Listos</div></div>
+    <div class="stat"><div class="stat-val" id="cnt-e" style="color:var(--muted)">0</div><div class="stat-lbl">Entregados</div></div>
+    <div class="stat"><div class="stat-val" id="cnt-prom" style="color:#25D366">—</div><div class="stat-lbl">Prom. cocina</div></div>
+  </div>
+  <div class="header-btns">
+    <button class="hbtn" onclick="window.location.href='../ordenar.html'" style="background:rgba(255,90,0,.2);border-color:rgba(255,90,0,.5);color:#FF5A00;">🏪 Tienda</button>
+    <button class="hbtn" onclick="window.location.href='admin.html'" style="background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.4);color:#3B82F6;">⚙️ Admin</button>
+    <button class="hbtn" id="compact-btn" onclick="toggleCompacto()">🔎 Compactar</button>
+    <button class="hbtn" id="sound-btn" onclick="toggleSound()">🔊 ON</button>
+    <span id="clock" style="font-size:.75rem;color:var(--muted);"></span>
+  </div>
+</div>
+
+<!-- Selector de empleado (debajo de los botones, arriba del contenido) -->
+<div style="display:flex;justify-content:center;padding:.6rem 1rem;background:rgba(0,0,0,.2);">
+  <select id="filtro-empleado" onchange="cambiarFiltroEmpleado()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:10px;padding:.6rem 1.2rem;font-family:inherit;font-size:.95rem;font-weight:700;cursor:pointer;min-width:240px;text-align:center;">
+    <option value="">👥 Todos los empleados</option>
+  </select>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="activas" onclick="setTab('activas')">🍳 En Proceso</div>
+  <div class="tab" data-tab="historial" onclick="setTab('historial')">📋 Historial</div>
+</div>
+
+<!-- Grid -->
+<div id="limpiar-barra" style="display:none;padding:0 1rem .5rem;text-align:center;">
+  <button onclick="limpiarPantallaCocina()"
+     style="background:rgba(255,90,0,.12);border:1px solid rgba(255,90,0,.4);color:#FF5A00;
+            border-radius:10px;padding:.6rem 1.2rem;font-family:inherit;font-size:.85rem;
+            font-weight:700;cursor:pointer;">
+     🧹 Limpiar pantalla (ocultar del historial)
+  </button>
+  <div style="font-size:.68rem;color:#777;margin-top:.4rem;">No borra las órdenes del sistema, solo limpia esta pantalla</div>
+</div>
+<div class="grid" id="kds-grid"></div>
+
+<!-- ═══ MODAL EDITOR ═══ -->
+<div class="modal-ov" id="edit-modal" onclick="if(event.target===this)cerrarEditor()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <div class="modal-title" id="edit-modal-title">✏️ Editar Orden</div>
+      <button class="modal-close" onclick="cerrarEditor()">✕</button>
+    </div>
+    <div class="modal-body" id="edit-modal-body"></div>
+  </div>
+</div>
+
+<!-- Overlay para maximizar una orden a pantalla completa -->
+<div id="max-overlay" onclick="if(event.target===this)cerrarMaximizado()">
+  <button id="max-close" onclick="cerrarMaximizado()">✕ Cerrar</button>
+  <div id="max-content"></div>
+</div>
+
+<script src="../js/estados.js?v=1788145000"></script>
+<script type="module">
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import {
+    getFirestore, collection, onSnapshot, updateDoc, deleteDoc,
+    doc, addDoc, serverTimestamp, query, orderBy, limit, getDocs
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const FB_CONFIG = {
+    apiKey:"AIzaSyAQPpVvqUJ_F8-zZiCNfg77vFbu5UKPz5k",
+    authDomain:"tortas-tortuga.firebaseapp.com",
+    projectId:"tortas-tortuga",
+    storageBucket:"tortas-tortuga.firebasestorage.app",
+    messagingSenderId:"828578668114",
+    appId:"1:828578668114:web:747331efe534341d97098b"
+};
+const app = getApps().length ? getApps()[0] : initializeApp(FB_CONFIG);
+const db  = getFirestore(app);
+
+/* ── Estado global ─────────────────────────────────────────── */
+function _playBell(doble) {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        function beep(freq, start, dur) {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.connect(g); g.connect(ctx.destination);
+            o.frequency.value = freq;
+            o.type = 'sine';
+            g.gain.setValueAtTime(0, ctx.currentTime + start);
+            g.gain.linearRampToValueAtTime(0.4, ctx.currentTime + start + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+            o.start(ctx.currentTime + start);
+            o.stop(ctx.currentTime + start + dur);
+        }
+        beep(880, 0, 0.3);
+        beep(660, 0.15, 0.3);
+        beep(880, 0.3, 0.4);
+        if (doble) { beep(880, 0.9, 0.3); beep(660, 1.05, 0.3); beep(880, 1.2, 0.4); }
+    } catch(e) {}
+}
+
+let todos       = [];
+// Identidad del empleado/tortumóvil logueado, para que cada cocina muestre
+// SOLO sus órdenes: las que él tomó (cajeroId) + las que aceptó en Pedidos
+// Disponibles (repartidorId). El gerente/supervisor puede ver todas.
+function _leerCoc(k){ return localStorage.getItem(k) || sessionStorage.getItem(k); }
+const _miIdCocina     = (_leerCoc('tt_emp_id') || _leerCoc('tt_cajero_id') || '').trim();
+const _miNombreCocina = (_leerCoc('tt_emp_nombre') || _leerCoc('tt_cajero_nombre') || _miIdCocina).trim();
+const _miRolCocina    = (_leerCoc('tt_emp_rol') || _leerCoc('tt_cajero_rol') || '').toLowerCase();
+const _esGerenteCocina = _miRolCocina.indexOf('gerente') >= 0 || _miRolCocina.indexOf('supervisor') >= 0 || _miRolCocina.indexOf('dueñ') >= 0 || _miRolCocina.indexOf('admin') >= 0;
+
+// ── FILTRO POR EMPLEADO (selector del header) ──
+let _filtroEmpleadoId = '';
+
+function _pasaFiltroEmpleado(p) {
+    if (!_filtroEmpleadoId) return true; // "Todos"
+    return String(p.cajeroId) === String(_filtroEmpleadoId) ||
+           String(p.cajeroNombre) === String(_filtroEmpleadoId);
+}
+
+window.cambiarFiltroEmpleado = function() {
+    const sel = document.getElementById('filtro-empleado');
+    _filtroEmpleadoId = sel ? sel.value : '';
+    // Actualizar el texto verde del encabezado según lo seleccionado
+    const elVerde = document.getElementById('mi-tortumovil');
+    if (elVerde) {
+        if (_filtroEmpleadoId && sel) {
+            // Texto de la opción elegida (sin el emoji)
+            const nombreSel = sel.options[sel.selectedIndex].text.replace('👤 ', '').trim();
+            elVerde.textContent = '· ' + nombreSel;
+        } else {
+            elVerde.textContent = _esGerenteCocina ? '· Todas (gerente)' : ('· ' + (_miNombreCocina || 'Mi tortumóvil'));
+        }
+    }
+    // Re-procesar con la última data guardada (sin esperar nuevo snapshot)
+    if (window._ultimaDataCruda) {
+        todos = window._ultimaDataCruda.filter(_esMiOrden).filter(_pasaFiltroEmpleado);
+        if (typeof renderGrid === 'function') renderGrid();
+    }
+};
+
+// Cargar empleados en el selector (desde Firebase)
+async function cargarEmpleadosFiltro() {
+    try {
+        const snap = await getDocs(collection(db, 'empleados'));
+        const sel = document.getElementById('filtro-empleado');
+        if (!sel) return;
+        const vistos = new Set();
+        snap.forEach(function(d) {
+            const e = d.data();
+            const eid = e.empleadoId || e.id || d.id;
+            const nombre = e.nombre || eid;
+            if (vistos.has(eid)) return;
+            vistos.add(eid);
+            const opt = document.createElement('option');
+            opt.value = eid;
+            opt.textContent = '👤 ' + nombre;
+            sel.appendChild(opt);
+        });
+    } catch(e) {
+        // silencioso
+    }
+}
+// Cargar al iniciar
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(cargarEmpleadosFiltro, 500); });
+} else {
+    setTimeout(cargarEmpleadosFiltro, 500);
+}
+
+// ¿Esta orden pertenece a MI tortumóvil? (la tomé yo, o la acepté en ruta)
+function _esMiOrden(p) {
+    if (_esGerenteCocina) return true; // el gerente ve todas las cocinas
+    if (!_miIdCocina && !_miNombreCocina) return true; // sin identidad, ver todas
+    return (p.cajeroId && p.cajeroId === _miIdCocina) ||
+           (p.cajeroNombre && p.cajeroNombre === _miNombreCocina) ||
+           (p.tortumovilId && p.tortumovilId === _miIdCocina) ||
+           (p.repartidorId && p.repartidorId === _miIdCocina);
+}
+// Mostrar de quién es esta cocina en el encabezado
+setTimeout(function(){
+    var el = document.getElementById('mi-tortumovil');
+    if (el) {
+        el.textContent = _esGerenteCocina ? '· Todas (gerente)' : ('· ' + (_miNombreCocina || 'Mi tortumóvil'));
+    }
+}, 100);
+let tabActual   = 'activas';
+// Pedidos que la cocina "limpió" de la pantalla del historial.
+// NO se borran del sistema, solo se ocultan de esta vista. Se guarda en
+// localStorage para que persista aunque se recargue la pantalla.
+let ocultosCocina = new Set(JSON.parse(localStorage.getItem('tt_cocina_ocultos') || '[]'));
+let soundOn     = true;
+let prevNuevas  = 0;
+let _primeraCarga = true;
+let editPedido  = null;
+let timerInterval;
+
+/* ── REST API de Cocina ─────────────────────────────────────── */
+const KitchenAPI = {
+    // Cambiar estado de un pedido (registra timestamp del cambio)
+    setEstado: async (id, estado) => {
+        // Guardar SIEMPRE la etiqueta canónica (evita textos inconsistentes)
+        const clave = TTEstados.normalizar(estado);
+        const updates = { estado: TTEstados.info(estado).etiqueta };
+        // Registrar cuándo pasó a cada estado
+        if (clave === 'EN_COCINA')      updates['tiempos.enCocina']  = Date.now();
+        else if (clave === 'LISTO')     updates['tiempos.lista']     = Date.now();
+        else if (clave === 'EN_CAMINO') updates['tiempos.enCamino']  = Date.now();
+        else if (clave === 'ENTREGADO') updates['tiempos.entregada'] = Date.now();
+        // Al terminar (Listo/Entregado), quitar la prioridad 911 (ya se atendió)
+        if (clave === 'LISTO' || clave === 'ENTREGADO') {
+            updates.prioridad911 = false;
+        }
+        await updateDoc(doc(db,'pedidos',id), updates);
+        // Si esta orden estaba "oculta" (limpiada antes), quitarla de ocultos
+        // para que reaparezca en el historial con su nuevo estado.
+        if (ocultosCocina.has(id)) {
+            ocultosCocina.delete(id);
+            localStorage.setItem('tt_cocina_ocultos', JSON.stringify([...ocultosCocina]));
+        }
+    },
+    // Actualizar items y modificaciones de un pedido
+    updateItems: async (id, itemsData) => {
+        const itemsStr = itemsData.map(i =>
+            i.nombre + (i.modificaciones?.length ? ' (' + i.modificaciones.join(', ') + ')' : '') + ' - $' + (i.precio||0).toFixed(2)
+        ).join(' | ');
+        await updateDoc(doc(db,'pedidos',id), { itemsData, items: itemsStr });
+    },
+    // Eliminar un pedido completo
+    deletePedido: async (id) => {
+        await deleteDoc(doc(db,'pedidos',id));
+    },
+    // Añadir nota interna a un pedido
+    addNota: async (id, nota) => {
+        await updateDoc(doc(db,'pedidos',id), { notaCocina: nota });
+    },
+    // Cambiar cliente/nombre
+    updateCliente: async (id, cliente) => {
+        await updateDoc(doc(db,'pedidos',id), { cliente });
+    }
+};
+window.KitchenAPI = KitchenAPI;
+
+/* ── Reloj ─────────────────────────────────────────────────── */
+setInterval(() => {
+    document.getElementById('clock').textContent =
+        new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+/* ── Sound ─────────────────────────────────────────────────── */
+window.toggleSound = () => {
+    soundOn = !soundOn;
+    document.getElementById('sound-btn').textContent = soundOn ? '🔊 ON' : '🔇 OFF';
+};
+
+/* ── Modo compacto (minimizar para ver más órdenes) ─────────── */
+window.toggleCompacto = () => {
+    document.body.classList.toggle('compacto');
+    const on = document.body.classList.contains('compacto');
+    const btn = document.getElementById('compact-btn');
+    if (btn) btn.textContent = on ? '🔎 Ampliar' : '🔎 Compactar';
+};
+
+/* ── Maximizar una orden a pantalla completa ────────────────── */
+window.maximizarOrden = (id) => {
+    const p = todos.find(x => x.id === id);
+    if (!p) return;
+    const cont = document.getElementById('max-content');
+    if (cont) cont.innerHTML = renderCard(p);
+    document.getElementById('max-overlay')?.classList.add('open');
+};
+window.cerrarMaximizado = () => {
+    document.getElementById('max-overlay')?.classList.remove('open');
+};
+function playBell(doble=false) {
+    _playBell(doble);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+window.setTab = (tab) => {
+    tabActual = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab===tab));
+    // El botón "Limpiar pantalla" solo aparece en el Historial
+    const barra = document.getElementById('limpiar-barra');
+    if (barra) barra.style.display = (tab === 'historial') ? 'block' : 'none';
+    renderGrid();
+};
+
+// Quita UNA orden individual del historial visible (control orden por orden).
+// No la borra del sistema, solo la oculta de la vista normal.
+window.limpiarOrdenCocina = (id) => {
+    if (!id) return;
+    ocultosCocina.add(id);
+    localStorage.setItem('tt_cocina_ocultos', JSON.stringify([...ocultosCocina]));
+    renderGrid();
+};
+
+// Alterna ver el historial COMPLETO (todas las órdenes, incluidas las que se
+// quitaron individualmente) para revisar dudas o reclamos. No afecta el sistema.
+let verTodoHistorial = false;
+window.toggleVerTodo = () => {
+    verTodoHistorial = !verTodoHistorial;
+    renderGrid();
+};
+
+/* ── Timer helpers ─────────────────────────────────────────── */
+function timerClass(secs) {
+    const m = secs/60;
+    return m < 10 ? 'ok' : m < 20 ? 'warn' : 'late';
+}
+function timerTxt(secs) {
+    const m = Math.floor(secs/60), s = Math.floor(secs%60);
+    return m < 1 ? s+'s' : m+'m'+(s<10?'0'+s:s)+'s';
+}
+
+/* ── Parse items ────────────────────────────────────────────── */
+function parseItems(p) {
+    if (p.itemsData && Array.isArray(p.itemsData) && p.itemsData.length) return p.itemsData;
+    if (!p.items) return [];
+    return p.items.split(' | ').map(s => {
+        const idx = s.lastIndexOf(' - $');
+        const nombre = idx>0 ? s.slice(0,idx) : s;
+        const precio = idx>0 ? parseFloat(s.slice(idx+4)) || 0 : 0;
+        return { nombre, precio, modificaciones:[] };
+    });
+}
+
+/* ── Nombre COMPACTO para cocina ──────────────────────────────
+   Las tortas Original/Turkey/Pork se muestran con un código corto
+   según el precio, para que el cocinero lea más rápido. Solo afecta
+   la pantalla de cocina; el ticket, cliente y reportes no cambian.
+     Original → 1A ($17) / 1B ($16) / 1C ($14)
+     Turkey   → 2A / 2B / 2C
+     Pork     → 3A / 3B / 3C                                     */
+function nombreCorto(item) {
+    const n = (item.nombre || '').toLowerCase();
+    const precio = Number(item.precio) || 0;
+    // Sufijo por precio: 17→A, 16→B, 14→C
+    let suf = '';
+    if (precio === 17) suf = 'A';
+    else if (precio === 16) suf = 'B';
+    else if (precio === 14) suf = 'C';
+
+    let base = null, num = null;
+    if (n.includes('original'))      { base = 'Original';      num = '1'; }
+    else if (n.includes('turkey'))   { base = 'Turkey';        num = '2'; }
+    else if (n.includes('pork'))     { base = 'Pork Head Chz'; num = '3'; }
+
+    // Solo compactar si es una de esas tortas Y el precio coincide con A/B/C
+    if (base && suf) return base + ' ' + num + suf;
+    // Cualquier otro producto se muestra con su nombre normal
+    return item.nombre;
+}
+
+/* ── Render card ────────────────────────────────────────────── */
+function renderCard(p) {
+    const ahora  = Date.now();
+    const est    = p.estado || '';
+    const claveEst = TTEstados.normalizar(est);
+    const terminado = TTEstados.fueraDeCocina(est);
+    // Inicio del cronómetro: normalmente cuándo se creó la orden. PERO si la
+    // orden fue reactivada/reenviada (tiempos.reiniciado, ej. como 911), el
+    // reloj cuenta SIEMPRE desde ese reinicio — así el tiempo (tanto en vivo
+    // como el congelado en el historial) refleja solo ESTA preparación, no la
+    // acumulada desde el pedido original.
+    let ts = p.creado?.seconds ? p.creado.seconds*1000 : ahora;
+    if (p.tiempos && p.tiempos.reiniciado && p.tiempos.reiniciado > ts) {
+        ts = p.tiempos.reiniciado;
+    }
+    const es911 = p.prioridad911 === true && !terminado;
+    const _diag = es911 ? '<div style="font-size:.85rem;color:#fff;font-weight:900;background:#F44336;border-radius:6px;padding:2px 8px;display:inline-block;margin-top:2px;">🚨 PRIORIDAD 911 — URGENTE</div>' : '';
+    // Tiempo final: se congela en el momento en que terminó ESTA preparación.
+    // Importante: solo usamos marcas POSTERIORES al inicio (ts), porque una
+    // orden reenviada como 911 conserva marcas viejas (enCocina/lista) de su
+    // preparación anterior — usarlas daría un tiempo negativo (que se vería
+    // como 0). Por eso filtramos: cada marca debe ser >= ts.
+    let finTiempo = ahora;
+    if (terminado && p.tiempos) {
+        const marcas = [p.tiempos.entregada, p.tiempos.enCamino, p.tiempos.lista, p.tiempos.enCocina]
+            .filter(function(t){ return t && t >= ts; });
+        // Tomamos la marca más apropiada (la primera válida en orden de prioridad)
+        finTiempo = (p.tiempos.entregada && p.tiempos.entregada >= ts) ? p.tiempos.entregada
+                  : (p.tiempos.enCamino && p.tiempos.enCamino >= ts) ? p.tiempos.enCamino
+                  : (p.tiempos.lista && p.tiempos.lista >= ts) ? p.tiempos.lista
+                  : (p.tiempos.enCocina && p.tiempos.enCocina >= ts) ? p.tiempos.enCocina
+                  : ahora;
+    }
+    const secs   = Math.max(0, (finTiempo - ts) / 1000);
+    const cls    = claveEst === 'EN_COCINA' ? 'prep'
+                 : claveEst === 'LISTO'     ? 'listo'
+                 : claveEst === 'ENTREGADO' ? 'entregado'
+                 : 'nuevo';
+    const ticket = p.folioStr || ('#' + (p.id||'').slice(-4).toUpperCase());
+    const hora   = new Date(ts).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    const items  = parseItems(p);
+
+    const estaOculta = ocultosCocina.has(p.id);
+    // La COCINA solo maneja "En preparación" y "Listo" (lo que pasa dentro de
+    // la cocina). Los estados posteriores (En camino/Entregado) los manejan los
+    // repartidores; aquí se muestran como solo lectura.
+    const selectorCocina = `<select class="kbtn-estado" onchange="setEstado('${p.id}', this.value)" style="flex:1;padding:.5rem;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:#111;color:#fff;font-family:inherit;font-size:.82rem;font-weight:700;cursor:pointer;">
+        <option ${claveEst === 'NUEVO' ? 'selected' : ''}>Nuevo 🆕</option>
+        <option ${claveEst === 'EN_COCINA' ? 'selected' : ''}>En preparación 🧑‍🍳</option>
+        <option ${claveEst === 'LISTO' ? 'selected' : ''}>Listo ✅</option>
+    </select>`;
+    // Etiqueta de solo lectura para órdenes que ya salieron de cocina
+    const soloLectura = `<div style="flex:1;padding:.5rem;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#888;font-size:.82rem;font-weight:700;text-align:center;">${est || '—'}</div>`;
+
+    const acciones = (cls === 'nuevo' || cls === 'prep')
+        ? selectorCocina
+        : estaOculta
+        ? `<button class="kbtn" style="flex:1;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);color:#888;" disabled>🙈 Quitada de pantalla</button>`
+        : `<div style="display:flex;gap:.4rem;flex:1;align-items:center;">${soloLectura}<button class="kbtn" style="background:rgba(255,90,0,.12);border:1px solid rgba(255,90,0,.4);color:#FF5A00;padding:.5rem .7rem;" onclick="limpiarOrdenCocina('${p.id}')">🧹</button></div>`;
+
+    return `<div class="kcard ${cls}" id="kcard-${p.id}">
+        <div class="kcard-head">
+            <div>
+                <div class="kticket">#${String(ticket).replace(/^#+/, '')} <span style="font-size:.9rem;color:var(--muted);font-weight:400;">${hora}</span></div>
+                ${_diag}
+                <div class="kcliente">${p.cliente||p.nombre||'Cliente'} ${p.notaCocina?'<span style="color:var(--yellow);font-size:.7rem;">📝 '+p.notaCocina+'</span>':''}</div>
+                ${p.cajeroNombre ? `<div class="kcajero" style="display:inline-flex;align-items:center;gap:.3rem;margin-top:.25rem;font-size:.72rem;font-weight:700;color:#FF7A33;background:rgba(255,90,0,.12);padding:.2rem .55rem;border-radius:6px;border:1px solid rgba(255,90,0,.25);">👤 ${p.cajeroNombre}</div>` : ''}
+            </div>
+            <div class="ktimer ${timerClass(secs)}" data-ts="${ts}"${terminado ? ` data-fin="${finTiempo}"` : ''} data-tid="ktimer-${p.id}">${timerTxt(secs)}</div>
+        </div>
+        <div class="kcard-items">
+            ${(window.agruparItems ? window.agruparItems(items) : items.map(function(i){ i.cantidad=1; return i; })).map(g=>`
+                <div class="kitem">
+                    <div class="kitem-name">${g.cantidad > 1 ? `<span style="color:#FF7A33;font-weight:900;">${g.cantidad}×</span> ` : ''}${nombreCorto(g._original || g)}</div>
+                    ${g.modificaciones?.length ? `<div class="kitem-mods">⚠️ ${g.modificaciones.join(' · ')}</div>` : ''}
+                </div>`).join('')}
+            ${(() => {
+                // Mostrar subtotal y total (si el pedido trae el desglose o el total)
+                var sub = p.desglose && typeof p.desglose.subtotal === 'number' ? p.desglose.subtotal : null;
+                var tot = (p.desglose && typeof p.desglose.total === 'number') ? p.desglose.total
+                        : (typeof p.totalNum === 'number' ? p.totalNum : null);
+                if (tot === null && !sub) return '';
+                return '<div style="margin-top:.5rem;padding-top:.5rem;border-top:1px dashed var(--border);font-size:.8rem;">' +
+                    (sub !== null ? '<div style="display:flex;justify-content:space-between;color:var(--muted);"><span>Subtotal</span><span>$' + sub.toFixed(2) + '</span></div>' : '') +
+                    (tot !== null ? '<div style="display:flex;justify-content:space-between;font-weight:800;color:var(--green);margin-top:.2rem;"><span>Total</span><span>$' + tot.toFixed(2) + '</span></div>' : '') +
+                    '</div>';
+            })()}
+        </div>
+        <div class="kcard-actions">${acciones}<button class="kbtn-max" onclick="maximizarOrden('${p.id}')" title="Ver en grande">🔍</button></div>
+    </div>`;
+}
+
+/* ── Render grid ─────────────────────────────────────────────── */
+function renderGrid() {
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const hoyFin = new Date(); hoyFin.setHours(23,59,59,999);
+
+    let pedidos = todos.filter(p => {
+        const ts = p.creado?.seconds ? new Date(p.creado.seconds*1000) : null;
+        return !ts || (ts >= hoy && ts <= hoyFin);
+    });
+
+    if (tabActual === 'activas') {
+        pedidos = pedidos.filter(p => TTEstados.enColaCocina(p.estado));
+        // Orden: primero las de PRIORIDAD 911 (urgentes), luego por turno de
+        // llegada (la más antigua primero, para respetar el orden de entrada).
+        pedidos.sort((a,b) => {
+            const p911a = a.prioridad911 === true ? 1 : 0;
+            const p911b = b.prioridad911 === true ? 1 : 0;
+            if (p911a !== p911b) return p911b - p911a;   // las 911 primero
+            const ta = a.creado?.seconds || 0;
+            const tb = b.creado?.seconds || 0;
+            if (ta !== tb) return ta - tb;               // más antigua primero
+            return (a.folio || 0) - (b.folio || 0);
+        });
+    } else {
+        // Historial: pedidos terminados (Listo/Entregado/En camino/Cancelado).
+        // Normalmente se ocultan los que se quitaron individualmente, PERO si
+        // "verTodoHistorial" está activo, se muestran TODOS (para revisar dudas).
+        pedidos = pedidos.filter(p =>
+            TTEstados.fueraDeCocina(p.estado)
+            && (verTodoHistorial || !ocultosCocina.has(p.id))
+        );
+        pedidos.sort((a,b) => (b.creado?.seconds||0) - (a.creado?.seconds||0));
+    }
+
+    // Contadores totales hoy
+    const todosHoy = todos.filter(p => {
+        const ts = p.creado?.seconds ? new Date(p.creado.seconds*1000) : null;
+        return !ts || (ts >= hoy && ts <= hoyFin);
+    });
+    document.getElementById('cnt-n').textContent = todosHoy.filter(p=>TTEstados.es(p.estado,'NUEVO')).length;
+    document.getElementById('cnt-p').textContent = todosHoy.filter(p=>TTEstados.es(p.estado,'EN_COCINA')).length;
+    document.getElementById('cnt-l').textContent = todosHoy.filter(p=>TTEstados.es(p.estado,'LISTO')).length;
+    document.getElementById('cnt-e').textContent = todosHoy.filter(p=>TTEstados.es(p.estado,'ENTREGADO')).length;
+
+    // ── Promedio de tiempo de cocina en tiempo real ──
+    // Mide el tiempo de PREPARACIÓN de cada orden terminada hoy: desde que
+    // empezó (o desde el reinicio, si fue reenviada como 911) hasta que la
+    // cocina la marcó lista. Cada orden cuenta individualmente su propio
+    // tiempo — las 911 NO acumulan el tiempo del pedido original.
+    const terminadasConTiempo = todosHoy.filter(function(p){
+        const fin = p.tiempos && (p.tiempos.lista || p.tiempos.entregada);
+        return fin && (TTEstados.estaListo(p.estado) || TTEstados.estaEnCamino(p.estado) || TTEstados.estaEntregado(p.estado));
+    });
+    const promEl = document.getElementById('cnt-prom');
+    if (terminadasConTiempo.length && promEl) {
+        let totalSegs = 0;
+        let cuenta = 0;
+        terminadasConTiempo.forEach(function(p){
+            // Inicio: el reinicio si existe (911), si no la creación de la orden
+            let inicio = p.creado?.seconds ? p.creado.seconds * 1000 : null;
+            if (p.tiempos.reiniciado && (!inicio || p.tiempos.reiniciado > inicio)) {
+                inicio = p.tiempos.reiniciado;
+            }
+            // Fin: la marca de terminado que sea POSTERIOR al inicio (para no
+            // usar marcas viejas de una preparación anterior si fue 911).
+            let fin = null;
+            if (p.tiempos.lista && (!inicio || p.tiempos.lista >= inicio)) fin = p.tiempos.lista;
+            else if (p.tiempos.entregada && (!inicio || p.tiempos.entregada >= inicio)) fin = p.tiempos.entregada;
+            if (inicio && fin && fin > inicio) {
+                totalSegs += (fin - inicio) / 1000;
+                cuenta++;
+            }
+        });
+        if (cuenta > 0) {
+            const promSegs = totalSegs / cuenta;
+            const m = Math.floor(promSegs / 60);
+            promEl.textContent = m < 1 ? '<1m' : (m + 'm');
+        } else {
+            promEl.textContent = '—';
+        }
+    } else if (promEl) {
+        promEl.textContent = '—';
+    }
+
+    const grid = document.getElementById('kds-grid');
+
+    // Botón general en el Historial: alternar entre ver todo o solo lo no quitado
+    let botonVerTodo = '';
+    if (tabActual === 'historial') {
+        const cuantosOcultos = ocultosCocina.size;
+        botonVerTodo = `<div style="width:100%;text-align:center;padding:0 0 .8rem;">
+            <button onclick="toggleVerTodo()"
+                style="background:${verTodoHistorial ? 'rgba(37,211,102,.12)' : 'rgba(91,155,255,.12)'};
+                       border:1px solid ${verTodoHistorial ? 'rgba(37,211,102,.4)' : 'rgba(91,155,255,.4)'};
+                       color:${verTodoHistorial ? '#25D366' : '#5B9BFF'};
+                       border-radius:10px;padding:.6rem 1.4rem;font-family:inherit;font-size:.85rem;
+                       font-weight:700;cursor:pointer;">
+                ${verTodoHistorial ? '✅ Viendo TODO — volver a normal' : '📜 Ver historial completo' + (cuantosOcultos ? ` (${cuantosOcultos} quitadas)` : '')}
+            </button>
+        </div>`;
+    }
+
+    if (!pedidos.length) {
+        const msgs = {
+            activas: '¡Sin órdenes pendientes!',
+            listas: 'Sin órdenes listas por entregar',
+            historial: 'Sin órdenes en el historial'
+        };
+        grid.innerHTML = botonVerTodo + `<div class="empty"><div class="empty-ico">🍳</div><div class="empty-lbl">${msgs[tabActual]}</div></div>`;
+        return;
+    }
+    grid.innerHTML = botonVerTodo + pedidos.map(renderCard).join('');
+}
+
+/* ── setEstado ──────────────────────────────────────────────── */
+window.setEstado = async (id, estado) => {
+    try { await KitchenAPI.setEstado(id, estado); }
+    catch(e) { alert('Error: ' + e.message); }
+};
+
+/* ── EDITOR COMPLETO ────────────────────────────────────────── */
+window.abrirEditor = (id) => {
+    editPedido = todos.find(p => p.id === id);
+    if (!editPedido) return;
+    const ticket = (todos.find(p=>p.id===id)||{}).folioStr || ('#'+id.slice(-4).toUpperCase());
+    document.getElementById('edit-modal-title').textContent = '✏️ Orden #' + String(ticket).replace(/^#+/, '');
+    renderEditor();
+    document.getElementById('edit-modal').classList.add('open');
+};
+
+window.cerrarEditor = () => {
+    document.getElementById('edit-modal').classList.remove('open');
+    editPedido = null;
+};
+
+function renderEditor() {
+    if (!editPedido) return;
+    const p     = editPedido;
+    const items = parseItems(p);
+    const est   = p.estado || 'Nuevo';
+
+    const statusOpts = [
+        {val:'Nuevo 🆕',lbl:'🆕 Nueva'},
+        {val:'En preparación 🧑‍🍳',lbl:'🍳 En Cocina'},
+        {val:'Listo ✅',lbl:'✅ Listo'},
+        {val:'Entregado 🎉',lbl:'🎉 Entregado'}
+    ];
+
+    document.getElementById('edit-modal-body').innerHTML = `
+
+        /* Estado */
+        <div style="margin-bottom:.85rem;">
+            <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:.4rem;">ESTADO DE LA ORDEN</div>
+            <div class="status-grid">
+                ${statusOpts.map(s=>`
+                    <button class="status-opt ${TTEstados.normalizar(est)===TTEstados.normalizar(s.val)?'selected':''}"
+                        onclick="selectEstado('${s.val}',this)">${s.lbl}</button>
+                `).join('')}
+            </div>
+        </div>
+
+        /* Cliente */
+        <div style="margin-bottom:.85rem;">
+            <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:.4rem;">CLIENTE</div>
+            <input id="edit-cliente" value="${p.cliente||p.nombre||''}"
+                style="width:100%;background:#111;border:1px solid var(--border);color:var(--text);
+                       border-radius:8px;padding:.45rem .75rem;font-family:inherit;font-size:.85rem;">
+        </div>
+
+        /* Nota cocina */
+        <div style="margin-bottom:.85rem;">
+            <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:.4rem;">📝 NOTA PARA COCINA</div>
+            <input id="edit-nota" value="${p.notaCocina||''}" placeholder="Ej: extra salsa, sin hielo..."
+                style="width:100%;background:#111;border:1px solid var(--border);color:var(--text);
+                       border-radius:8px;padding:.45rem .75rem;font-family:inherit;font-size:.82rem;">
+        </div>
+
+        /* Items */
+        <div style="font-size:.75rem;color:var(--muted);font-weight:700;margin-bottom:.4rem;">PRODUCTOS</div>
+        <div id="edit-items-list">
+            ${items.map((item,idx)=>`
+                <div class="edit-item" id="edit-item-${idx}">
+                    <div class="edit-item-header">
+                        <div class="edit-item-name">${item.nombre}</div>
+                        <div style="display:flex;align-items:center;gap:.4rem;">
+                            <span class="edit-item-precio">$${(item.precio||0).toFixed(2)}</span>
+                            <button class="edit-item-del" onclick="eliminarItem(${idx})">✕ Quitar</button>
+                        </div>
+                    </div>
+                    <input class="edit-mods-input" id="mods-${idx}"
+                        value="${(item.modificaciones||[]).join(', ')}"
+                        placeholder="Modificaciones: sin cebolla, extra salsa...">
+                </div>
+            `).join('')}
+        </div>
+
+        /* Agregar producto */
+        <div class="add-section" style="margin-top:.65rem;">
+            <div class="add-section-title">➕ Agregar Producto</div>
+            <div class="add-row" style="margin-bottom:.4rem;">
+                <input class="add-input" id="add-nombre" placeholder="Nombre del producto">
+                <input class="add-input" id="add-precio" type="number" placeholder="$0.00" style="max-width:80px;">
+            </div>
+            <input class="add-input" id="add-mods" placeholder="Modificaciones (opcional)" style="width:100%;margin-bottom:.4rem;">
+            <button class="add-btn" style="width:100%;" onclick="agregarItem()">➕ Agregar</button>
+        </div>
+
+        /* Botones */
+        <button class="save-btn" onclick="guardarCambios()">💾 Guardar Cambios</button>
+        <button class="cancel-btn" onclick="cerrarEditor()">Cancelar</button>
+        <div style="margin-top:.65rem;padding-top:.65rem;border-top:1px solid var(--border);">
+            <button onclick="confirmarEliminar('${p.id}')"
+                style="width:100%;padding:.6rem;background:rgba(255,68,68,.1);
+                       border:1px solid rgba(255,68,68,.3);color:var(--red);
+                       border-radius:10px;font-family:inherit;font-size:.82rem;
+                       font-weight:700;cursor:pointer;">
+                🗑️ Eliminar esta orden
+            </button>
+        </div>
+    `;
+}
+
+let estadoSeleccionado = null;
+window.selectEstado = (val, btn) => {
+    estadoSeleccionado = val;
+    document.querySelectorAll('.status-opt').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+};
+
+window.eliminarItem = (idx) => {
+    if (!editPedido) return;
+    let items = parseItems(editPedido);
+    function _hacer() {
+        items.splice(idx, 1);
+        editPedido._tempItems = items;
+        renderEditor();
+        // Restaurar estado seleccionado
+        if (estadoSeleccionado) {
+            document.querySelectorAll('.status-opt').forEach(b => {
+                if (b.textContent.includes(estadoSeleccionado.split(' ')[0])) b.classList.add('selected');
+            });
+        }
+    }
+    var msg = `¿Quitar "${items[idx]?.nombre}"?`;
+    if (window.ttConfirm) window.ttConfirm(msg).then(function(ok){ if (ok) _hacer(); });
+    else if (confirm(msg)) _hacer();
+};
+
+window.agregarItem = () => {
+    const nombre = document.getElementById('add-nombre')?.value.trim();
+    const precio = parseFloat(document.getElementById('add-precio')?.value) || 0;
+    const mods   = document.getElementById('add-mods')?.value.trim();
+    if (!nombre) { alert('Escribe el nombre del producto'); return; }
+
+    let items = editPedido._tempItems || parseItems(editPedido);
+    items.push({ nombre, precio, modificaciones: mods ? [mods] : [] });
+    editPedido._tempItems = items;
+    renderEditor();
+};
+
+window.guardarCambios = async () => {
+    if (!editPedido) return;
+    const id = editPedido.id;
+
+    try {
+        // Recoger items actualizados con modificaciones editadas
+        let items = editPedido._tempItems || parseItems(editPedido);
+        const itemsDivs = document.querySelectorAll('[id^="mods-"]');
+        itemsDivs.forEach((inp, idx) => {
+            if (items[idx]) {
+                const modsStr = inp.value.trim();
+                items[idx].modificaciones = modsStr ? modsStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
+            }
+        });
+
+        // Guardar estado
+        const nuevoEstado = estadoSeleccionado || editPedido.estado;
+        const cliente     = document.getElementById('edit-cliente')?.value.trim() || editPedido.cliente;
+        const nota        = document.getElementById('edit-nota')?.value.trim() || '';
+
+        // Actualizar en Firestore
+        await KitchenAPI.updateItems(id, items);
+        await KitchenAPI.setEstado(id, nuevoEstado);
+        await KitchenAPI.updateCliente(id, cliente);
+        await KitchenAPI.addNota(id, nota);
+
+        // Limpiar temp
+        editPedido._tempItems = null;
+        estadoSeleccionado    = null;
+        cerrarEditor();
+
+        // Toast visual
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#25D366;color:#fff;padding:.65rem 1.25rem;border-radius:12px;font-weight:700;font-size:.88rem;z-index:9999;';
+        toast.textContent = '✅ Orden actualizada';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
+
+    } catch(e) {
+        alert('Error al guardar: ' + e.message);
+    }
+};
+
+window.confirmarEliminar = async (id) => {
+    var msg = '⚠️ ¿Eliminar esta orden permanentemente? Esta acción no se puede deshacer.';
+    var ok = window.ttConfirm ? await window.ttConfirm(msg) : confirm(msg);
+    if (!ok) return;
+    try {
+        await KitchenAPI.deletePedido(id);
+        cerrarEditor();
+    } catch(e) { alert('Error: ' + e.message); }
+};
+
+/* ── onSnapshot ─────────────────────────────────────────────── */
+let _kdsUnsub = null;
+function iniciarKDS(){
+  if(_kdsUnsub) try{_kdsUnsub();}catch(e){}
+  _primeraCarga = true;  // cada (re)conexión: la 1a instantánea solo fija base
+  // Optimización: en vez de traer TODA la colección (que crece sin límite),
+  // traemos solo los 150 pedidos más recientes por fecha. La cocina solo
+  // necesita los del día y recientes; esto mantiene la pantalla ágil.
+  // Si la consulta optimizada fallara (ej. falta de índice), se usa la normal.
+  function _procesarSnap(snap) {
+    // Guardar la data cruda para poder re-filtrar al cambiar el selector
+    if (snap && snap.docs) window._ultimaDataCruda = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    // Cada cocina muestra SOLO las órdenes de su tortumóvil (las que tomó el
+    // empleado + las que aceptó en Pedidos Disponibles). El gerente ve todas.
+    todos = (window._ultimaDataCruda || []).filter(_esMiOrden).filter(_pasaFiltroEmpleado);
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const nuevas = todos.filter(p => {
+        const ts = p.creado?.seconds ? new Date(p.creado.seconds*1000) : null;
+        return ts && ts >= hoy && TTEstados.es(p.estado,'NUEVO');
+    }).length;
+
+    // En la PRIMERA carga solo fijamos la línea base, sin sonar la campana
+    // (si no, sonaría por las órdenes que ya estaban al abrir la pantalla).
+    if (_primeraCarga) {
+        prevNuevas = nuevas;
+        _primeraCarga = false;
+        renderGrid();
+        return;
+    }
+
+    if (nuevas > prevNuevas) {
+        const diff = nuevas - prevNuevas;
+        playBell(diff > 1);
+        const b = document.getElementById('alert-banner');
+        b.textContent = `🔔 ${diff} NUEVA${diff>1?'S':''} ORDEN${diff>1?'ES':''}`;
+        b.style.display = 'block';
+        setTimeout(()=>{ b.style.display='none'; }, 5000);
+        document.title = `🔔 ${nuevas} NUEVA(S) — Cocina`;
+        setTimeout(()=>{ document.title='🧑‍🍳 Cocina — Tortas Tortuga'; }, 6000);
+        if (Notification.permission==='granted') {
+            new Notification('🐢 Nueva Orden — Cocina', {
+                body: diff + ' nueva(s) orden(es)',
+                icon:'../favicon.ico', tag:'cocina'
+            });
+        }
+    }
+    prevNuevas = nuevas;
+
+    // Actualizar editor si está abierto
+    if (editPedido) {
+        const updated = todos.find(p=>p.id===editPedido.id);
+        if (updated && !editPedido._tempItems) editPedido = updated;
+    }
+
+    renderGrid();
+  }
+
+  // Intentar la consulta optimizada (limitada). Si falla (ej. falta de índice),
+  // usar la consulta completa como respaldo para no quedarnos sin pedidos.
+  try {
+    const qPedidos = query(collection(db,'pedidos'), orderBy('creado','desc'), limit(150));
+    _kdsUnsub = onSnapshot(qPedidos, _procesarSnap, err => {
+        console.warn('Consulta optimizada falló, usando la completa:', err.message);
+        _kdsUnsub = onSnapshot(collection(db,'pedidos'), _procesarSnap);
+    });
+  } catch(e) {
+    _kdsUnsub = onSnapshot(collection(db,'pedidos'), _procesarSnap);
+  }
+}
+
+// Iniciar el KDS (conectar a Firebase)
+iniciarKDS();
+
+// ── Reconexión de seguridad ─────────────────────────────────────
+// Un listener en tiempo real puede caerse en silencio si la pantalla
+// se queda abierta muchas horas o hay un corte breve de red — sin
+// esto, la única forma de verlo era refrescando la página a mano.
+// Se reconecta solo cada 2 minutos, y también al volver a la pestaña
+// o recuperar internet.
+setInterval(iniciarKDS, 2 * 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') iniciarKDS();
+});
+window.addEventListener('online', iniciarKDS);
+
+// Actualizar SOLO los timers cada segundo, en su lugar (ligero, sin
+// redibujar toda la cuadrícula → corre fluido segundo a segundo).
+function actualizarTimers() {
+    const ahora = Date.now();
+    document.querySelectorAll('.ktimer[data-ts]').forEach(el => {
+        const ts = parseInt(el.getAttribute('data-ts')) || ahora;
+        // Si el timer está congelado (pedido entregado), usar el tiempo final
+        // guardado en vez de "ahora" → el reloj se queda detenido.
+        const fin = el.getAttribute('data-fin');
+        const hasta = fin ? parseInt(fin) : ahora;
+        const secs = Math.max(0, (hasta - ts) / 1000);
+        el.textContent = timerTxt(secs);
+        el.classList.remove('ok','warn','late');
+        el.classList.add(timerClass(secs));
+    });
+}
+setInterval(actualizarTimers, 1000);
+
+// Pedir permiso notificaciones
+if ('Notification' in window && Notification.permission==='default') {
+    Notification.requestPermission();
+}
+</script>
+<script src="../js/tt-alert.js"></script>
+<script src="../js/perfil-barra.js?v=1788059171"></script>
+<script type="module" src="../js/contador-disponibles.js?v=1787291222"></script>
+</body>
+</html>

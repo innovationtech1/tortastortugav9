@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Compartir ubicacion - Tortas Tortuga</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: linear-gradient(160deg,#1a1a1a,#0d0d0d);
+    color:#fff; font-family:system-ui,-apple-system,sans-serif;
+    min-height:100vh; min-height:100dvh;
+    display:flex; align-items:center; justify-content:center; padding:1.5rem;
+  }
+  .card {
+    background:#1e1e1e; border-radius:24px; padding:2rem 1.5rem;
+    max-width:420px; width:100%; text-align:center;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .logo { font-size:3rem; margin-bottom:.5rem; }
+  h1 { font-size:1.4rem; color:#FF5A00; margin-bottom:.5rem; }
+  .sub { color:#aaa; font-size:.95rem; line-height:1.5; margin-bottom:1.5rem; }
+  .pedido-info {
+    background:rgba(255,90,0,.08); border-radius:12px; padding:.8rem;
+    margin-bottom:1.5rem; font-size:.85rem; color:#FF5A00;
+  }
+  button {
+    width:100%; padding:1.1rem; border:none; border-radius:16px;
+    font-family:inherit; font-size:1.05rem; font-weight:800; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
+  }
+  .btn-share {
+    background:linear-gradient(135deg,#25D366,#1DB954); color:#fff;
+    box-shadow:0 6px 20px rgba(37,211,102,.35);
+  }
+  .btn-share:active { transform:scale(.98); }
+  .status { margin-top:1.2rem; font-size:.9rem; min-height:1.5rem; line-height:1.5; }
+  .spinner {
+    display:inline-block; width:18px; height:18px; border:2.5px solid rgba(255,255,255,.3);
+    border-top-color:#fff; border-radius:50%; animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .exito { color:#25D366; }
+  .error { color:#F44336; }
+  .mapa {
+    margin-top:1rem; border-radius:12px; overflow:hidden; display:none;
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .mapa iframe { width:100%; height:180px; border:0; display:block; }
+  .privacidad { margin-top:1.2rem; font-size:.72rem; color:#666; line-height:1.5; }
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🐢</div>
+    <h1>Tortas Tortuga</h1>
+    <p class="sub">Comparte tu ubicacion para que podamos entregarte tu pedido a domicilio.</p>
+
+    <div class="pedido-info" id="pedido-info">Cargando pedido...</div>
+
+    <!-- Foto de referencia (opcional) -->
+    <div id="foto-ref-seccion" style="background:rgba(91,155,255,.06);border:1px solid rgba(91,155,255,.25);border-radius:12px;padding:.9rem;margin:1rem 0;text-align:left;">
+        <div style="font-size:.85rem;color:#5B9BFF;font-weight:800;margin-bottom:.3rem;">📸 Foto de referencia (opcional)</div>
+        <div style="font-size:.78rem;color:#bbb;line-height:1.4;margin-bottom:.6rem;">Sube una foto de tu casa o entrada para que el repartidor te encuentre fácil.</div>
+        <div id="foto-ref-preview" style="display:none;margin-bottom:.6rem;position:relative;">
+            <img id="foto-ref-img" src="" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;">
+            <button type="button" onclick="quitarFotoRef()" style="position:absolute;top:.4rem;right:.4rem;background:rgba(0,0,0,.6);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:.9rem;cursor:pointer;">✕</button>
+        </div>
+        <!-- Visor de cámara en vivo -->
+        <div id="foto-camara-visor" style="display:none;margin-bottom:.6rem;">
+            <video id="foto-camara-video" autoplay playsinline style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;background:#000;"></video>
+            <div style="display:flex;gap:.4rem;margin-top:.5rem;">
+                <button type="button" onclick="capturarFotoCamara()" style="flex:2;padding:.7rem;background:linear-gradient(135deg,#FF7A33,#FF5A00);border:none;color:#fff;border-radius:8px;font-family:inherit;font-weight:800;font-size:.85rem;cursor:pointer;">📸 Capturar</button>
+                <button type="button" onclick="girarCamara()" style="flex:1;padding:.7rem;background:rgba(91,155,255,.15);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-family:inherit;font-weight:700;font-size:.8rem;cursor:pointer;">🔄 Girar</button>
+                <button type="button" onclick="cerrarCamara()" style="flex:1;padding:.7rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;font-family:inherit;font-weight:700;font-size:.8rem;cursor:pointer;">Cancelar</button>
+            </div>
+        </div>
+        <!-- Botones de foto -->
+        <div id="foto-ref-botones" style="display:flex;gap:.5rem;">
+            <button type="button" onclick="abrirCamara()" style="flex:1;text-align:center;padding:.7rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">📷 Cámara</button>
+            <label style="flex:1;text-align:center;padding:.7rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;">🖼️ Galería<input type="file" accept="image/*" onchange="procesarFotoRef(this)" style="display:none;"></label>
+        </div>
+    </div>
+
+    <!-- Aviso del cargo -->
+    <div style="background:rgba(251,183,36,.1);border:1px solid rgba(251,183,36,.35);border-radius:12px;padding:.8rem;margin-bottom:1rem;text-align:left;">
+        <div style="font-size:.85rem;color:#25D366;font-weight:800;">💵 Costo del envío: $5.00</div>
+        <div style="font-size:.75rem;color:#aaa;margin-top:.2rem;">Al compartir tu ubicación aceptas el cargo de $5 por el tortumóvil. Lo que ordenes se cobra aparte.</div>
+    </div>
+
+    <button class="btn-share" id="btn-share" onclick="compartirUbicacion()">
+      <span>📍</span> Compartir mi ubicacion
+    </button>
+
+    <div class="status" id="status"></div>
+
+    <div class="mapa" id="mapa"></div>
+
+    <!-- Referencia opcional para el repartidor -->
+    <div id="ref-section" style="display:none;margin-top:1.2rem;text-align:left;">
+      <label style="font-size:.8rem;color:#aaa;display:block;margin-bottom:.4rem;">
+        Alguna referencia? (opcional)
+      </label>
+      <input id="referencia" type="text" placeholder="Ej: casa azul, porton negro, apto 3"
+        style="width:100%;box-sizing:border-box;padding:.7rem;background:#0d0d0d;border:1.5px solid rgba(255,255,255,.15);color:#fff;border-radius:10px;font-family:inherit;font-size:.9rem;outline:none;">
+      <button onclick="guardarReferencia()" id="btn-ref"
+        style="margin-top:.6rem;padding:.7rem;background:rgba(255,90,0,.15);border:1.5px solid rgba(255,90,0,.4);color:#FF5A00;border-radius:10px;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;width:100%;">
+        Guardar referencia
+      </button>
+    </div>
+
+    <p class="privacidad">
+      Tu ubicacion solo se usa para entregar este pedido. No se comparte con terceros.
+    </p>
+
+    <button onclick="regresarAMiPedido()"
+      style="margin-top:1.2rem;padding:.8rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);color:#ccc;border-radius:12px;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;width:100%;">
+      &larr; Regresar a mi pedido
+    </button>
+    <button onclick="cerrarUbicacion()"
+      style="margin-top:.6rem;padding:.8rem;background:rgba(255,90,0,.1);border:1px solid rgba(255,90,0,.3);color:#FF7A33;border-radius:12px;font-family:inherit;font-size:.9rem;font-weight:700;cursor:pointer;width:100%;">
+      ✕ Cerrar
+    </button>
+  </div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, updateDoc, getDoc, collection, getDocs, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+const app = initializeApp({
+  apiKey: "AIzaSyAQPpVvqUJ_F8-zZiCNfg77vFbu5UKPz5k",
+  authDomain: "tortas-tortuga.firebaseapp.com",
+  projectId: "tortas-tortuga",
+  storageBucket: "tortas-tortuga.firebasestorage.app",
+  messagingSenderId: "828578668114",
+  appId: "1:828578668114:web:747331efe534341d97098b"
+});
+const db = getFirestore(app);
+
+// Leer el id del pedido de la URL: ?pedido=XXXX
+const params = new URLSearchParams(window.location.search);
+const pedidoId = params.get('pedido');
+
+const infoEl = document.getElementById('pedido-info');
+const statusEl = document.getElementById('status');
+const btnEl = document.getElementById('btn-share');
+
+// ID del pedido a usar (viene en la URL o se busca el último del cliente)
+window._pedidoActivoId = pedidoId;
+
+(async function cargarPedido() {
+    try {
+        var p = null;
+        // 1) Si viene el ID en la URL, cargar ese pedido
+        if (pedidoId) {
+            const snap = await getDoc(doc(db, 'pedidos', pedidoId));
+            if (snap.exists()) { p = snap.data(); p.id = snap.id; window._pedidoActivoId = snap.id; }
+        }
+        // 2) Si no hay ID (o no se encontró), buscar el ÚLTIMO pedido del cliente por su teléfono
+        if (!p) {
+            var tel = (localStorage.getItem('tt_cliente_telefono') || sessionStorage.getItem('tt_cliente_telefono') || '').replace(/[^0-9]/g,'');
+            if (tel) {
+                var qs = await getDocs(collection(db, 'pedidos'));
+                var mios = [];
+                qs.forEach(function(d){
+                    var x = d.data(); x.id = d.id;
+                    var t = String(x.telefono||'').replace(/[^0-9]/g,'');
+                    if (t === tel) mios.push(x);
+                });
+                // Ordenar por fecha (más reciente primero)
+                mios.sort(function(a,b){
+                    var fa = (a.creado && a.creado.seconds) ? a.creado.seconds : 0;
+                    var fb = (b.creado && b.creado.seconds) ? b.creado.seconds : 0;
+                    return fb - fa;
+                });
+                if (mios.length) { p = mios[0]; window._pedidoActivoId = p.id; }
+            }
+        }
+        // 3) Mostrar la info del pedido
+        if (p) {
+            var items = '';
+            if (Array.isArray(p.itemsData) && p.itemsData.length && window.agruparItems) {
+                items = window.agruparItems(p.itemsData).map(function(g){ return g.cantidad + '× ' + g.nombre; }).join(', ');
+            } else if (typeof p.items === 'string' && p.items.indexOf('Pendiente') < 0) {
+                items = p.items.split(' | ').slice(0,4).join(', ');
+            }
+            infoEl.innerHTML = '<b>Pedido ' + (p.folioStr || ('#'+(p.folio||''))) + '</b>' +
+                (p.cliente ? ' · ' + p.cliente : '') +
+                (items ? '<div style="font-size:.8rem;color:#bbb;margin-top:.4rem;">🛍️ ' + items + '</div>' : '');
+            if (p.ubicacionCliente && p.ubicacionCliente.lat) {
+                statusEl.innerHTML = '<span class="exito">✅ Ya compartiste tu ubicación. ¡Gracias!</span>';
+            }
+        } else {
+            infoEl.textContent = 'No encontramos tu pedido. Puedes compartir tu ubicación de todas formas.';
+        }
+    } catch(e) {
+        console.warn('Error cargando pedido:', e);
+        infoEl.textContent = 'Pedido a domicilio';
+    }
+})();
+
+window.cerrarUbicacion = function() {
+    // Liberar cámara si está abierta
+    if (window._camaraStream) { try { window._camaraStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){} }
+    // Intentar cerrar la pestaña; si no se puede, ir a la vista del pedido
+    try { window.close(); } catch(e){}
+    setTimeout(function(){
+        if (!window.closed) { window.location.href = 'pages/mi-pedido.html'; }
+    }, 300);
+};
+
+window.regresarAMiPedido = function() {
+    // Volver a la vista del cliente. Si venimos desde ahi (misma app),
+    // history.back es lo mas fluido; si no, ir directo a mi-pedido.
+    if (document.referrer && document.referrer.indexOf('mi-pedido') >= 0) {
+        history.back();
+    } else {
+        window.location.href = 'pages/mi-pedido.html';
+    }
+};
+
+window.guardarReferencia = async function() {
+    if (!pedidoId) return;
+    var ref = (document.getElementById('referencia').value || '').trim();
+    if (!ref) return;
+    var btn = document.getElementById('btn-ref');
+    btn.textContent = 'Guardando...';
+    try {
+        await updateDoc(doc(db, 'pedidos', pedidoId), { referenciaCliente: ref });
+        btn.textContent = 'Referencia guardada';
+        btn.style.background = 'rgba(37,211,102,.15)';
+        btn.style.borderColor = '#25D366';
+        btn.style.color = '#25D366';
+    } catch(e) {
+        btn.textContent = 'Error, reintenta';
+    }
+};
+
+
+// ── DISTANCIA A LA TORTUMÓVIL MÁS CERCANA (lado cliente) ──
+function _distanciaMillasCli(lat1, lng1, lat2, lng2) {
+    const R = 3958.8;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLng = (lng2-lng1) * Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+let _distWatchCli = null;
+function iniciarDistanciaCliente(cliLat, cliLng) {
+    // Crear el elemento de distancia si no existe
+    let distEl = document.getElementById('dist-tortumovil');
+    if (!distEl) {
+        distEl = document.createElement('div');
+        distEl.id = 'dist-tortumovil';
+        distEl.style.cssText = 'margin-top:1rem;padding:1rem;border-radius:14px;' +
+            'background:linear-gradient(160deg,rgba(255,90,0,.15),rgba(255,90,0,.05));' +
+            'border:1px solid rgba(255,90,0,.3);text-align:center;';
+        distEl.innerHTML = '<div style="color:#aaa;font-size:.8rem;">Buscando la tortumóvil más cercana…</div>';
+        statusEl.parentNode.insertBefore(distEl, statusEl.nextSibling);
+    }
+
+    // Escuchar la colección de ubicaciones en vivo
+    if (_distWatchCli) _distWatchCli();
+    _distWatchCli = onSnapshot(collection(db, 'ubicaciones'), function(snap) {
+        let masCerca = null, minDist = Infinity;
+        snap.forEach(function(d) {
+            const u = d.data();
+            if (u.lat && u.lng) {
+                const dist = _distanciaMillasCli(cliLat, cliLng, u.lat, u.lng);
+                if (dist < minDist) { minDist = dist; masCerca = u; }
+            }
+        });
+        if (masCerca) {
+            const millas = minDist.toFixed(1);
+            const nombre = masCerca.nombre || 'Tortumóvil';
+            distEl.innerHTML =
+                '<div style="font-size:.75rem;color:#aaa;margin-bottom:.3rem;">🛵 ' + nombre + '</div>' +
+                '<div style="font-size:1.6rem;font-weight:900;color:#FF7A33;">' + millas + ' millas</div>' +
+                '<div style="font-size:.75rem;color:#aaa;margin-top:.2rem;">de distancia de ti</div>';
+        } else {
+            distEl.innerHTML = '<div style="color:#aaa;font-size:.8rem;">La tortumóvil aún no comparte su ubicación.</div>';
+        }
+    });
+}
+
+// ── Foto de referencia (galería, con compresión) ──
+window._fotoRefData = null;
+window.procesarFotoRef = function(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var botones = document.getElementById('foto-ref-botones');
+    if (botones) botones.innerHTML = '<div style="width:100%;text-align:center;color:#5B9BFF;font-weight:700;font-size:.85rem;padding:.5rem;">⏳ Procesando…</div>';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+            try {
+                var canvas = document.createElement('canvas');
+                var scale = Math.min(1, 800 / img.width);
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                var dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                if (dataUrl.length > 700000) dataUrl = canvas.toDataURL('image/jpeg', 0.4);
+                window._fotoRefData = dataUrl;
+                try { localStorage.setItem('tt_foto_ref_ubi', dataUrl); } catch(e){}
+                _mostrarPreviewFoto(dataUrl);
+            } catch(err) { _restaurarBotonFoto(); }
+        };
+        img.onerror = _restaurarBotonFoto;
+        img.src = e.target.result;
+    };
+    reader.onerror = _restaurarBotonFoto;
+    reader.readAsDataURL(file);
+};
+function _mostrarPreviewFoto(dataUrl) {
+    var prev = document.getElementById('foto-ref-preview');
+    var imgEl = document.getElementById('foto-ref-img');
+    var botones = document.getElementById('foto-ref-botones');
+    if (imgEl) imgEl.src = dataUrl;
+    if (prev) prev.style.display = 'block';
+    if (botones) botones.style.display = 'none';
+}
+function _restaurarBotonFoto() {
+    var botones = document.getElementById('foto-ref-botones');
+    if (botones) {
+        botones.style.display = 'flex';
+        botones.innerHTML =
+            '<button type="button" onclick="abrirCamara()" style="flex:1;text-align:center;padding:.7rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">📷 Cámara</button>' +
+            '<label style="flex:1;text-align:center;padding:.7rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;">🖼️ Galería<input type="file" accept="image/*" onchange="procesarFotoRef(this)" style="display:none;"></label>';
+    }
+}
+
+// ── Cámara en vivo (getUserMedia) ──
+window.abrirCamara = async function() {
+    var visor = document.getElementById('foto-camara-visor');
+    var botones = document.getElementById('foto-ref-botones');
+    var video = document.getElementById('foto-camara-video');
+    if (!window._camaraFacing) window._camaraFacing = 'environment';
+    try {
+        var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: window._camaraFacing } }, audio: false });
+        window._camaraStream = stream;
+        if (video) video.srcObject = stream;
+        if (visor) visor.style.display = 'block';
+        if (botones) botones.style.display = 'none';
+    } catch(e) {
+        alert('No se pudo abrir la cámara. Da permiso o usa la galería.');
+    }
+};
+
+window.girarCamara = async function() {
+    window._camaraFacing = (window._camaraFacing === 'user') ? 'environment' : 'user';
+    if (window._camaraStream) { window._camaraStream.getTracks().forEach(function(t){ t.stop(); }); window._camaraStream = null; }
+    var video = document.getElementById('foto-camara-video');
+    try {
+        var stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: window._camaraFacing } }, audio: false });
+        window._camaraStream = stream;
+        if (video) video.srcObject = stream;
+    } catch(e) {
+        window._camaraFacing = (window._camaraFacing === 'user') ? 'environment' : 'user';
+        try {
+            var s2 = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: window._camaraFacing } }, audio: false });
+            window._camaraStream = s2; if (video) video.srcObject = s2;
+            alert('Este dispositivo solo tiene una cámara.');
+        } catch(e2) { alert('No se pudo cambiar de cámara.'); }
+    }
+};
+
+window.capturarFotoCamara = function() {
+    var video = document.getElementById('foto-camara-video');
+    if (!video) return;
+    var canvas = document.createElement('canvas');
+    var scale = Math.min(1, 800 / (video.videoWidth || 800));
+    canvas.width = Math.round((video.videoWidth || 640) * scale);
+    canvas.height = Math.round((video.videoHeight || 480) * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+    if (dataUrl.length > 700000) dataUrl = canvas.toDataURL('image/jpeg', 0.4);
+    window._fotoRefData = dataUrl;
+    try { localStorage.setItem('tt_foto_ref_ubi', dataUrl); } catch(e){}
+    cerrarCamara();
+    _mostrarPreviewFoto(dataUrl);
+};
+
+window.cerrarCamara = function() {
+    if (window._camaraStream) { window._camaraStream.getTracks().forEach(function(t){ t.stop(); }); window._camaraStream = null; }
+    var visor = document.getElementById('foto-camara-visor');
+    var botones = document.getElementById('foto-ref-botones');
+    if (visor) visor.style.display = 'none';
+    if (botones) botones.style.display = 'flex';
+};
+window.quitarFotoRef = function() {
+    window._fotoRefData = null;
+    try { localStorage.removeItem('tt_foto_ref_ubi'); } catch(e){}
+    var prev = document.getElementById('foto-ref-preview');
+    if (prev) prev.style.display = 'none';
+    _restaurarBotonFoto();
+};
+
+window.compartirUbicacion = function() {
+    if (!pedidoId) return;
+    if (!navigator.geolocation) {
+        statusEl.innerHTML = '<span class="error">Tu navegador no soporta ubicacion.</span>';
+        return;
+    }
+
+    statusEl.innerHTML = '<span class="spinner"></span> Obteniendo tu ubicacion...';
+    btnEl.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        async function(pos) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            const precision = Math.round(pos.coords.accuracy);
+
+            try {
+                // Guardar ubicación + foto de referencia + cargo de $5 del tortumóvil
+                var _fotoRef = (window._fotoRefData || localStorage.getItem('tt_foto_ref_ubi') || null);
+                // Leer el total actual del pedido para sumarle el cargo de $5
+                var _totalProductos = 0;
+                try {
+                    var _snap = await getDoc(doc(db, 'pedidos', pedidoId));
+                    if (_snap.exists()) {
+                        var _d = _snap.data();
+                        // Si ya tiene productos, respetar su totalNum; si es solicitud, es 0
+                        _totalProductos = Number(_d.totalNum) || 0;
+                        // Evitar duplicar el cargo si ya se aplicó antes
+                        if (_d.cargoServicio && _d.ubicacionCompartida) _totalProductos = _totalProductos - 0;
+                    }
+                } catch(e){}
+                var _totalConCargo = _totalProductos + 5;
+                var _updateData = {
+                    ubicacionCliente: {
+                        lat: lat,
+                        lng: lng,
+                        precision: precision,
+                        compartidaEn: new Date().toISOString(),
+                    },
+                    cargoServicio: 5,          // $5 por envío de tortumóvil
+                    ubicacionCompartida: true,
+                    totalNum: _totalConCargo,
+                    total: '$' + _totalConCargo.toFixed(2)
+                };
+                if (_fotoRef) _updateData.fotoReferencia = _fotoRef;
+                await updateDoc(doc(db, 'pedidos', pedidoId), _updateData);
+                try { localStorage.removeItem('tt_foto_ref_ubi'); } catch(e){}
+
+                statusEl.innerHTML = '<span class="exito">Ubicacion enviada! El repartidor ya puede verte. Gracias!</span>';
+
+                // Calcular distancia a la tortumovil mas cercana y mostrarla al cliente (en vivo)
+                iniciarDistanciaCliente(lat, lng);
+
+                // Mostrar mini mapa de confirmacion
+                const mapa = document.getElementById('mapa');
+                mapa.innerHTML = '<iframe src="https://maps.google.com/maps?q=' + lat + ',' + lng + '&z=16&output=embed"></iframe>';
+                mapa.style.display = 'block';
+
+                btnEl.innerHTML = '<span>\u2705</span> Ubicacion compartida';
+
+                // Mostrar campo de referencia opcional
+                var refSec = document.getElementById('ref-section');
+                if (refSec) refSec.style.display = 'block';
+            } catch(e) {
+                statusEl.innerHTML = '<span class="error">Error al enviar: ' + e.message + '. Intenta de nuevo.</span>';
+                btnEl.disabled = false;
+            }
+        },
+        function(err) {
+            var esIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            var esAndroid = /Android/i.test(navigator.userAgent);
+            var msg = '';
+            if (err.code === 1) {
+                // Permiso denegado
+                if (esIOS) {
+                    msg = '<b>📍 Activa tu ubicación</b><br><br>' +
+                        '1. Abre <b>Ajustes</b> del iPhone<br>' +
+                        '2. Busca <b>Safari</b> (o tu navegador)<br>' +
+                        '3. Toca <b>Ubicación</b> → <b>Permitir</b><br>' +
+                        '4. Vuelve y toca "Compartir mi ubicación"<br><br>' +
+                        'También: Ajustes → Privacidad → Localización (activada).';
+                } else if (esAndroid) {
+                    msg = '<b>📍 Activa tu ubicación</b><br><br>' +
+                        '1. Toca el 🔒 junto a la dirección web (arriba)<br>' +
+                        '2. Permisos → Ubicación → Permitir<br>' +
+                        '3. Vuelve y toca "Compartir mi ubicación"<br><br>' +
+                        'Y revisa que el GPS esté encendido.';
+                } else {
+                    msg = 'Debes permitir el acceso a tu ubicación. Toca el candado 🔒 en la barra y activa Ubicación.';
+                }
+            }
+            else if (err.code === 2) msg = 'Ubicación no disponible. Activa el <b>GPS</b> de tu teléfono e intenta de nuevo.';
+            else if (err.code === 3) msg = 'Tardó demasiado. Revisa tu señal e intenta de nuevo.';
+            else msg = 'No pudimos obtener tu ubicación. Intenta de nuevo.';
+            statusEl.innerHTML = '<div class="error" style="text-align:left;line-height:1.6;font-size:.85rem;">' + msg + '</div>';
+            btnEl.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+};
+</script>
+<script>
+// Helper de agrupación de productos (para el resumen del pedido)
+window.agruparItems = function(items){
+    if (!Array.isArray(items) || !items.length) return [];
+    var g = {}, orden = [];
+    items.forEach(function(it){
+        var nom = it.nombre || it.producto || it.name || 'Producto';
+        var prc = Number(it.precio)||0, v = it.variante||'';
+        var mods = (it.modificaciones&&it.modificaciones.length) ? it.modificaciones.slice().sort().join('|') : '';
+        var k = nom+'|'+prc+'|'+v+'|'+mods;
+        var cant = Number(it.cantidad)||1;
+        if (!g[k]) { g[k] = { nombre:nom, precio:prc, variante:v, cantidad:0 }; orden.push(k); }
+        g[k].cantidad += cant;
+    });
+    return orden.map(function(k){ return g[k]; });
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Bienvenido - Tortas Tortuga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/auth.css">
+<style>
+  .opciones { display:flex; flex-direction:column; gap:1rem; margin-top:.5rem; }
+  .opcion-card {
+    background: rgba(255,255,255,.03);
+    border: 1.5px solid rgba(255,255,255,.1);
+    border-radius: 18px;
+    padding: 1.4rem 1.2rem;
+    cursor: pointer;
+    transition: all .2s;
+    text-decoration: none;
+    display: block;
+  }
+  .opcion-card:hover {
+    border-color: var(--primary);
+    background: rgba(255,90,0,.06);
+    transform: translateY(-2px);
+  }
+  .opcion-card.empleado:hover {
+    border-color: #A78BFA;
+    background: rgba(167,139,250,.06);
+  }
+  .opcion-head { display:flex; align-items:center; gap:.9rem; margin-bottom:.5rem; }
+  .opcion-emoji {
+    font-size:1.8rem; width:52px; height:52px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(255,90,0,.12); border-radius:14px;
+  }
+  .opcion-card.empleado .opcion-emoji { background:rgba(167,139,250,.12); }
+  .opcion-titulo { font-size:1.1rem; font-weight:800; color:#fff; }
+  .opcion-desc { font-size:.85rem; color:#999; line-height:1.5; }
+  .opcion-flecha { margin-left:auto; color:var(--primary); font-size:1.3rem; font-weight:800; }
+  .opcion-card.empleado .opcion-flecha { color:#A78BFA; }
+  .welcome-back {
+    background: rgba(37,211,102,.08);
+    border: 1px solid rgba(37,211,102,.3);
+    border-radius: 14px; padding: 1rem 1.2rem; margin-bottom: 1.2rem;
+    display: none;
+  }
+  .welcome-back .wb-nombre { font-weight:800; color:#25D366; font-size:1rem; }
+  .welcome-back .wb-sub { font-size:.8rem; color:#999; margin-top:.2rem; }
+  .divisor { text-align:center; margin:1.3rem 0 .5rem; position:relative; }
+  .divisor span { background:var(--surface); padding:0 1rem; color:#666; font-size:.78rem; position:relative; z-index:1; }
+  .divisor::before { content:''; position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,.1); }
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<div class="auth-bg">
+    <div class="auth-card">
+
+        <div class="auth-logo">
+            <span class="logo-emoji">🐢</span>
+            <h1 class="logo-text">Tortas Tortuga</h1>
+            <p class="logo-sub" data-i18n="biz.sub">San Antonio, Texas</p>
+        </div>
+
+        <!-- Sesion activa (si la hay) -->
+        <div class="welcome-back" id="welcome-back">
+            <div class="wb-nombre" id="wb-nombre">Hola de nuevo!</div>
+            <div class="wb-sub" id="wb-sub"></div>
+            <a href="../ordenar.html" class="btn-primary" style="margin-top:.8rem;text-decoration:none;display:block;text-align:center;" data-i18n="biz.continuar">
+                Continuar a ordenar →
+            </a>
+            <button onclick="cerrarSesion()" style="width:100%;margin-top:.5rem;background:none;border:none;color:#888;font-family:inherit;font-size:.82rem;cursor:pointer;padding:.4rem;" data-i18n="biz.cerrar_sesion">
+                Cerrar sesión
+            </button>
+        </div>
+
+        <p style="text-align:center;color:#aaa;font-size:.92rem;margin-bottom:1.3rem;" id="intro-text" data-i18n="biz.saludo">
+            ¿Cómo quieres entrar?
+        </p>
+
+        <div class="opciones">
+            <!-- CLIENTE -->
+            <a href="entrar.html" class="opcion-card cliente">
+                <div class="opcion-head">
+                    <div class="opcion-emoji">🛒</div>
+                    <div>
+                        <div class="opcion-titulo" data-i18n="biz.cliente">Soy cliente</div>
+                    </div>
+                    <div class="opcion-flecha">→</div>
+                </div>
+                <div class="opcion-desc" data-i18n="biz.cliente_desc">Entra con tu teléfono para hacer tu pedido rápido y fácil.</div>
+            </a>
+
+            <!-- EMPLEADO / CAJERO -->
+            <a href="empleados.html" class="opcion-card empleado">
+                <div class="opcion-head">
+                    <div class="opcion-emoji">🏪</div>
+                    <div>
+                        <div class="opcion-titulo" data-i18n="biz.empleado">Soy empleado</div>
+                    </div>
+                    <div class="opcion-flecha">→</div>
+                </div>
+                <div class="opcion-desc" data-i18n="biz.empleado_desc">Cajeros y gerentes: entra con tu número de empleado y PIN para tomar y cobrar órdenes.</div>
+            </a>
+        </div>
+
+        <div class="divisor"><span>Necesitas una cuenta para ordenar</span></div>
+    </div>
+</div>
+
+<script src="../js/tt-alert.js"></script>
+<script src="../js/perfil-barra.js?v=1787439078"></script>
+<script>
+// Detectar sesion activa y mostrar bienvenida
+(function() {
+    var sesion = window.TT_getSesion ? window.TT_getSesion() : null;
+
+    var wb = document.getElementById('welcome-back');
+    var wbNom = document.getElementById('wb-nombre');
+    var wbSub = document.getElementById('wb-sub');
+    var intro = document.getElementById('intro-text');
+
+    if (!sesion) return;
+
+    // CLIENTE con sesión activa: ir DIRECTO al menú (no volver a pedir login)
+    if (sesion.tipo === 'cliente') {
+        window.location.replace('../ordenar.html');
+        return;
+    }
+
+    if (sesion.tipo === 'empleado') {
+        wbNom.textContent = 'Hola, ' + sesion.nombre.split(' ')[0] + '!';
+        wbSub.textContent = 'Sesión de ' + (sesion.rol || 'empleado') + ' activa';
+    } else {
+        wbNom.textContent = 'Hola, ' + sesion.nombre.split(' ')[0] + '!';
+        wbSub.textContent = 'Listo para hacer tu pedido';
+    }
+    wb.style.display = 'block';
+    if (intro) intro.textContent = 'O entra con otra cuenta:';
+})();
+
+window.cerrarSesion = function() {
+    ['tt_cliente_nombre','tt_cliente_telefono','tt_cliente_ts','tt_cliente_uid',
+     'tt_cajero_id','tt_cajero_nombre','tt_cajero_rol','tt_cajero_ts',
+     'tt_emp_id','tt_emp_pin','tt_emp_ts','tt_emp_docid','tt_emp_nombre','tt_emp_rol'].forEach(function(k){
+        sessionStorage.removeItem(k);
+    });
+    location.reload();
+};
+</script>
+<script src="../js/idioma.js?v=1787110633"></script>
+</body>
+</html>

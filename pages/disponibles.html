@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Pedidos Disponibles — Tortas Tortuga</title>
+<link rel="stylesheet" href="../css/style.css?v=1">
+<link rel="stylesheet" href="../css/leaflet/leaflet.css" />
+<script src="../js/leaflet/leaflet.js"></script>
+<style>
+  :root { --primary:#FF5A00; --bg:#0E0E0E; --surface:#1C1C1C; --muted:#888; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:#fff; font-family:'Poppins',system-ui,sans-serif; margin:0; }
+  .disp-header {
+    background:linear-gradient(135deg,#FF5A00,#FF8C00); padding:1rem;
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;
+  }
+  .disp-header h1 { font-size:1.1rem; font-weight:900; margin:0; display:flex; align-items:center; gap:.5rem; }
+  .disp-header .rep-nombre { font-size:.72rem; opacity:.92; font-weight:600; }
+  .estado-linea {
+    display:flex; align-items:center; justify-content:center; gap:.5rem;
+    padding:.5rem; font-size:.8rem; font-weight:700;
+    background:rgba(37,211,102,.12); color:#25D366; border-bottom:1px solid rgba(37,211,102,.2);
+  }
+  .estado-linea.offline { background:rgba(255,255,255,.05); color:#888; }
+  .pulso { width:9px; height:9px; border-radius:50%; background:#25D366; animation:pulso 1.4s infinite; }
+  @keyframes pulso { 0%{opacity:1;transform:scale(1);} 50%{opacity:.4;transform:scale(1.4);} 100%{opacity:1;transform:scale(1);} }
+  .disp-cont { max-width:640px; margin:0 auto; padding:1rem; }
+  /* Mapa en vivo de la tortumóvil y los clientes */
+  #mapa-disp { width:100%; height:280px; background:#222; border-radius:0; }
+  .mapa-estado {
+    display:flex; align-items:center; justify-content:center; gap:.4rem;
+    padding:.45rem; font-size:.74rem; font-weight:700;
+    background:rgba(255,90,0,.1); color:#FF5A00; border-bottom:1px solid rgba(255,90,0,.2);
+  }
+  .mapa-estado.ok { background:rgba(37,211,102,.1); color:#25D366; border-color:rgba(37,211,102,.2); }
+  .pn-distancia {
+    display:inline-block; background:rgba(91,155,255,.15); color:#5B9BFF;
+    border:1px solid rgba(91,155,255,.35); border-radius:8px; padding:.15rem .55rem;
+    font-size:.72rem; font-weight:700; margin-left:.4rem;
+  }
+  /* El menú de navegación debe quedar por encima de los controles del mapa
+     (Leaflet usa z-index ~1000 en sus botones de zoom). */
+  #nav-menu-overlay { z-index: 4000 !important; }
+  /* Cuando el menú está abierto, ocultar los controles del mapa para que
+     no se traspasen sobre el menú. */
+  body.menu-abierto .leaflet-control-container { visibility: hidden; }
+  .controles {
+    display:flex; gap:.5rem; margin-bottom:1rem;
+  }
+  .ctrl-btn {
+    flex:1; background:var(--surface); border:1px solid rgba(255,255,255,.1);
+    border-radius:12px; padding:.7rem .5rem; text-align:center; cursor:pointer;
+    font-family:inherit; color:#fff; font-size:.72rem; font-weight:700;
+    display:flex; flex-direction:column; align-items:center; gap:.25rem;
+  }
+  .ctrl-btn.activo { border-color:rgba(37,211,102,.5); background:rgba(37,211,102,.1); color:#25D366; }
+  .ctrl-btn .ico { font-size:1.3rem; }
+  .pedido-nuevo {
+    background:var(--surface); border:2px solid rgba(255,90,0,.5);
+    border-radius:16px; padding:1.1rem; margin-bottom:.9rem;
+    animation:entra .3s ease;
+  }
+  @keyframes entra { from{transform:translateY(-10px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+  .pn-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.5rem; }
+  .pn-zona {
+    display:inline-block; background:rgba(255,90,0,.15); color:#FF5A00;
+    border:1px solid rgba(255,90,0,.4); border-radius:8px; padding:.2rem .7rem;
+    font-size:.78rem; font-weight:800; margin-bottom:.4rem;
+  }
+  .pn-cliente { font-size:1.05rem; font-weight:800; }
+  .pn-total { font-size:1.2rem; font-weight:900; color:#25D366; }
+  .pn-linea { font-size:.84rem; color:#ccc; margin:.25rem 0; }
+  .pn-linea a { color:#5B9BFF; }
+  .btn-aceptar {
+    width:100%; margin-top:.7rem; padding:.85rem; border-radius:12px; border:none;
+    background:linear-gradient(135deg,#25D366,#1DA851); color:#fff;
+    font-family:inherit; font-size:1rem; font-weight:800; cursor:pointer;
+  }
+  .btn-aceptar:active { transform:scale(.98); }
+  .btn-descartar {
+    width:100%; margin-top:.4rem; padding:.55rem; border-radius:10px;
+    background:transparent; border:1px solid rgba(255,255,255,.12); color:#888;
+    font-family:inherit; font-size:.78rem; cursor:pointer;
+  }
+  .vacio { text-align:center; padding:3rem 1rem; color:var(--muted); }
+  .vacio .emo { font-size:3rem; margin-bottom:.5rem; }
+  .cargando { text-align:center; padding:2rem; color:var(--muted); }
+  .link-ruta {
+    display:block; text-align:center; margin-top:1rem; color:#FF5A00;
+    font-weight:700; font-size:.85rem; text-decoration:none;
+  }
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<div class="disp-header">
+  <h1 style="flex:1;">🔔 Pedidos Disponibles</h1>
+  <div style="text-align:right;">
+    <div class="rep-nombre" id="rep-nombre">—</div>
+    <a href="empleados.html" style="color:#fff;font-size:.7rem;text-decoration:underline;opacity:.9;">Salir</a>
+  </div>
+</div>
+
+<!-- Menú de navegación -->
+<div id="nav-menu-overlay" onclick="if(event.target===this)toggleNavMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;">
+  <div id="nav-menu-panel" style="position:absolute;top:0;left:0;bottom:0;width:80%;max-width:300px;background:#141414;box-shadow:4px 0 20px rgba(0,0,0,.5);overflow-y:auto;">
+    <div style="background:linear-gradient(135deg,#FF5A00,#FF8C00);padding:1.1rem 1rem;font-weight:900;font-size:1.1rem;display:flex;align-items:center;justify-content:space-between;">
+      <span>🐢 Menú</span>
+      <button onclick="toggleNavMenu()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;width:34px;height:34px;font-size:1rem;cursor:pointer;">✕</button>
+    </div>
+    <div id="nav-menu-items"></div>
+  </div>
+</div>
+
+<div class="estado-linea" id="estado-linea">
+  <span class="pulso"></span> <span id="estado-txt">En línea · esperando pedidos</span>
+</div>
+
+<div class="mapa-estado" id="mapa-estado">📍 Activando tu ubicación…</div>
+<div id="mapa-disp"></div>
+
+<div class="disp-cont">
+  <div class="controles">
+    <button class="ctrl-btn activo" id="ctrl-sonido" onclick="toggleSonido()">
+      <span class="ico">🔊</span><span id="lbl-sonido">Sonido ON</span>
+    </button>
+    <button class="ctrl-btn activo" id="ctrl-vibrar" onclick="toggleVibrar()">
+      <span class="ico">📳</span><span id="lbl-vibrar">Vibrar ON</span>
+    </button>
+    <button class="ctrl-btn" id="ctrl-silenciar" onclick="silenciarAhora()">
+      <span class="ico">🔕</span><span>Silenciar ya</span>
+    </button>
+  </div>
+
+  <div id="lista-disp">
+    <div class="cargando">Cargando pedidos disponibles…</div>
+  </div>
+
+  <a href="mi-ruta.html" class="link-ruta">🛵 Ver mi ruta (pedidos aceptados) →</a>
+</div>
+
+<script src="../js/tt-alert.js"></script>
+<script type="module">
+import { db } from '../js/firebase-config.js';
+import { collection, onSnapshot, doc, runTransaction, getDocs, updateDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+function _leer(clave) { return sessionStorage.getItem(clave) || localStorage.getItem(clave); }
+
+const miId     = (_leer('tt_emp_id') || _leer('tt_cajero_id') || '').trim();
+const miNombre = (_leer('tt_emp_nombre') || _leer('tt_cajero_nombre') || '').trim();
+const miRol    = (_leer('tt_emp_rol') || _leer('tt_cajero_rol') || '').toLowerCase();
+
+// ── Menú de navegación (mismo que la barra de perfil) ──
+window.toggleNavMenu = function() {
+    const ov = document.getElementById('nav-menu-overlay');
+    const abierto = ov.style.display === 'block';
+    if (!abierto) construirNavMenu();
+    ov.style.display = abierto ? 'none' : 'block';
+    document.body.classList.toggle('menu-abierto', !abierto);
+};
+function construirNavMenu() {
+    const esGerente = /gerente|supervisor|admin|dueñ/.test(miRol);
+    const items = [
+        ['🏪','Tienda (Ordenar)','../ordenar.html', false],
+        ['🍳','Cocina','cocina.html', false],
+        ['🛵','Mi Ruta','mi-ruta.html', false],
+        ['🔔','Pedidos Disponibles','disponibles.html', false],
+        ['📊','Reportes','reportes.html', true],
+        ['⚙️','Panel Admin','admin.html', true],
+        ['🧑‍💼','Panel Empleado','empleados.html', false],
+        ['🏠','Inicio','../index.html', false],
+    ];
+    document.getElementById('nav-menu-items').innerHTML = items.map(function(it){
+        if (it[3] && !esGerente) return '';
+        return '<a href="'+it[2]+'" style="display:flex;align-items:center;gap:.8rem;padding:.9rem 1.1rem;'+
+            'color:#eee;text-decoration:none;font-size:.92rem;font-weight:600;border-bottom:1px solid rgba(255,255,255,.05);">'+
+            '<span style="font-size:1.2rem;width:26px;text-align:center;">'+it[0]+'</span>'+it[1]+'</a>';
+    }).join('');
+}
+
+// Preferencias de alarma (guardadas en el dispositivo)
+let sonidoOn = _leer('tt_disp_sonido') !== '0';
+let vibrarOn = _leer('tt_disp_vibrar') !== '0';
+
+// IDs de pedidos ya vistos (para detectar los nuevos y sonar solo entonces)
+let vistos = new Set();
+let primeraCarga = true;
+let descartados = new Set(); // pedidos que este repartidor descartó (solo en su pantalla)
+
+// Variables del mapa (declaradas temprano para que initMapaDisp pueda usarlas)
+let _mapa = null, _capaClientes = null, _marcadorYo = null;
+let _miPos = null; // {lat, lng} del repartidor
+
+if (!miId && !miNombre) {
+    document.getElementById('lista-disp').innerHTML =
+        '<div class="vacio"><div class="emo">🔒</div>Necesitas entrar con tu PIN de empleado.<br><br>' +
+        '<a href="bienvenida.html" style="color:#FF5A00;font-weight:700;">Ir a entrar</a></div>';
+    document.getElementById('estado-linea').classList.add('offline');
+    document.getElementById('estado-txt').textContent = 'Sin sesión';
+} else {
+    document.getElementById('rep-nombre').textContent = miNombre || miId;
+    aplicarPrefs();
+    // Los pedidos y la alarma van PRIMERO y por separado: si el mapa falla,
+    // los pedidos deben seguir llegando igual.
+    escuchar();
+    // El mapa se inicializa aparte, protegido, para que un fallo suyo
+    // no rompa el resto de la pantalla.
+    try {
+        initMapaDisp();
+    } catch (e) {
+        var est = document.getElementById('mapa-estado');
+        if (est) est.innerHTML = '⚠️ El mapa no se pudo cargar, pero los pedidos siguen activos.';
+    }
+}
+
+// ── Notificaciones del navegador ──
+// Pedir permiso al cargar (si no se ha decidido)
+(function _pedirPermisoNotif() {
+    try {
+        if ('Notification' in window && Notification.permission === 'default') {
+            // Pedir al primer toque del usuario (requisito de algunos navegadores)
+            document.addEventListener('click', function _once() {
+                Notification.requestPermission();
+                document.removeEventListener('click', _once);
+            }, { once: true });
+        }
+    } catch(e){}
+})();
+
+function _notificarNuevoPedido(cuantos) {
+    try {
+        if (!('Notification' in window)) return;
+        if (Notification.permission !== 'granted') return;
+        // Solo notificar si la pestaña no está visible (para no duplicar con el sonido)
+        var titulo = '🐢 ¡Nuevo pedido disponible!';
+        var cuerpo = cuantos > 1 ? ('Hay ' + cuantos + ' pedidos esperando repartidor.') : 'Un pedido nuevo espera repartidor.';
+        var notif = new Notification(titulo, {
+            body: cuerpo,
+            icon: '../icons/icon-192.png',
+            badge: '../icons/icon-192.png',
+            tag: 'nuevo-pedido-disponible',   // reemplaza notificaciones previas (no acumula)
+            renotify: true,
+            vibrate: [200,100,200]
+        });
+        notif.onclick = function() {
+            window.focus();
+            notif.close();
+        };
+        // Auto-cerrar a los 8 segundos
+        setTimeout(function(){ try { notif.close(); } catch(e){} }, 8000);
+    } catch(e) { console.warn('No se pudo mostrar notificación:', e); }
+}
+
+// ── Controles de alarma ──
+window.toggleSonido = function() {
+    sonidoOn = !sonidoOn;
+    if (sonidoOn) { desbloquearAudio(); setTimeout(beep, 100); if (navigator.vibrate) navigator.vibrate([200,100,200]); }
+    try { localStorage.setItem('tt_disp_sonido', sonidoOn ? '1' : '0'); } catch(e){}
+    aplicarPrefs();
+};
+window.toggleVibrar = function() {
+    vibrarOn = !vibrarOn;
+    try { localStorage.setItem('tt_disp_vibrar', vibrarOn ? '1' : '0'); } catch(e){}
+    aplicarPrefs();
+};
+window.silenciarAhora = function() { detenerAlarma(); };
+
+function aplicarPrefs() {
+    const bs = document.getElementById('ctrl-sonido'), bv = document.getElementById('ctrl-vibrar');
+    bs.classList.toggle('activo', sonidoOn);
+    document.getElementById('lbl-sonido').textContent = sonidoOn ? 'Sonido ON' : 'Sonido OFF';
+    bv.classList.toggle('activo', vibrarOn);
+    document.getElementById('lbl-vibrar').textContent = vibrarOn ? 'Vibrar ON' : 'Vibrar OFF';
+}
+
+// ── Alarma (sonido + vibración) ──
+let audioCtx = null, alarmaInterval = null;
+// Un solo "bib" a una frecuencia dada
+function unBib(startOffset, freq) {
+    try {
+        if (!audioCtx) return;
+        const t = audioCtx.currentTime + startOffset;
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        o.type = 'square'; // onda cuadrada = más fuerte y audible en cualquier bocina
+        o.frequency.value = freq || 1000;
+        o.connect(g); g.connect(audioCtx.destination);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.5, t + 0.01);
+        g.gain.setValueAtTime(0.5, t + 0.12);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+        o.start(t); o.stop(t + 0.16);
+    } catch(e){}
+}
+
+// "Bib bib" — dos tonos rápidos
+function beep() {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Si el contexto está suspendido (típico en móvil), reanudarlo
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        unBib(0, 1000);      // primer bib
+        unBib(0.22, 1000);   // segundo bib
+    } catch(e){}
+}
+
+// ── DESBLOQUEO DE AUDIO ──
+// Los navegadores (sobre todo móvil) bloquean el audio hasta que el usuario
+// toca la pantalla. Al primer toque, creamos y "despertamos" el AudioContext.
+let _audioDesbloqueado = false;
+function desbloquearAudio() {
+    if (_audioDesbloqueado) return;
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        // Tono silencioso para "activar" el audio del dispositivo
+        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        g.gain.value = 0.0001;
+        o.connect(g); g.connect(audioCtx.destination);
+        o.start(); o.stop(audioCtx.currentTime + 0.05);
+        // Activar vibración (pulso corto) para desbloquearla en móvil
+        if (navigator.vibrate) navigator.vibrate(1);
+        _audioDesbloqueado = true;
+    } catch(e){}
+}
+// Escuchar el primer toque/clic en cualquier parte
+['click','touchstart','touchend','keydown'].forEach(function(ev){
+    document.addEventListener(ev, desbloquearAudio, { once: false, passive: true });
+});
+function dispararAlarma() {
+    // Si ya está sonando, no reiniciar (evita duplicar el intervalo)
+    if (alarmaInterval) return;
+    // Primer bib inmediato
+    if (sonidoOn) beep();
+    if (vibrarOn && navigator.vibrate) navigator.vibrate([400, 200, 400]);
+    // Sonar de forma CONTINUA hasta que el repartidor acepte o descarte
+    alarmaInterval = setInterval(function(){
+        if (sonidoOn) beep();
+        if (vibrarOn && navigator.vibrate) navigator.vibrate([400, 200, 400]);
+    }, 1800);
+}
+function detenerAlarma() {
+    if (alarmaInterval) { clearInterval(alarmaInterval); alarmaInterval = null; }
+    if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// ── Descartar (solo lo oculta en la pantalla de este repartidor) ──
+window.descartarPedido = function(id) {
+    descartados.add(id);
+    detenerAlarma();
+    render(_ultimaLista);
+};
+
+// ── Aceptar (atómico: solo uno se lo queda) ──
+window.tomarOrdenSolicitud = function(pedidoId) {
+    // Abrir el menú (ordenar.html) para tomar la orden de esta solicitud.
+    // Pasa el ID de la solicitud para que al completar se ACTUALICE (no cree otra).
+    var base = location.pathname.replace(/[^\/]*$/, '');  // .../pages/
+    var url = base + '../ordenar.html?solicitud=' + encodeURIComponent(pedidoId);
+    window.location.href = url;
+};
+
+window.aceptarPedido = async function(id) {
+    detenerAlarma();
+
+    // Calcular tarifa sugerida por tiempo de llegada (usando el pedido de la lista actual)
+    var pedidoLista = (_ultimaLista || []).find(function(x){ return x.id === id; });
+    var cargoAplicar = null;
+    if (pedidoLista && pedidoLista.ubicacionCliente && pedidoLista.ubicacionCliente.lat) {
+        var sugerida = tarifaSugerida(pedidoLista);
+        if (sugerida === 'preguntar') {
+            var resp = prompt('Este pedido está a más de 1 hora.\n¿Cuánto quieres cobrar de envío? (escribe solo el número, ej. 25)', '25');
+            if (resp === null) return;  // canceló
+            var n = parseFloat(String(resp).replace(/[^0-9.]/g,''));
+            cargoAplicar = isNaN(n) ? null : n;
+        } else if (typeof sugerida === 'number') {
+            cargoAplicar = sugerida;
+        }
+    }
+
+    try {
+        await runTransaction(db, async (tx) => {
+            const ref = doc(db, 'pedidos', id);
+            const snap = await tx.get(ref);
+            if (!snap.exists()) throw new Error('no-existe');
+            const p = snap.data();
+            if (p.repartidorId) throw new Error('ya-tomado');
+            var cambios = {
+                repartidorId: miId,
+                repartidorNombre: miNombre,
+                repartidorAsignadoEn: new Date().toISOString(),
+                aceptadoPorRepartidor: true
+            };
+            // Guardar zona detectada automáticamente (si el pedido no tenía zona)
+            if (!p.zonaEntregaNombre && pedidoLista && pedidoLista._zonaDetectada) {
+                cambios.zonaEntregaId = pedidoLista._zonaDetectada.id;
+                cambios.zonaEntregaNombre = pedidoLista._zonaDetectada.nombre;
+                cambios.zonaAutodetectada = true;
+            }
+            // Guardar la dirección legible para que el repartidor la vea en su ruta
+            if (pedidoLista && pedidoLista._direccionLegible) {
+                cambios.direccionLegible = pedidoLista._direccionLegible;
+            }
+            // Aplicar la tarifa de envío según el tiempo, ajustando el total
+            if (cargoAplicar != null) {
+                var totalProductos = Number(p.totalNum) || parseFloat(String(p.total||'').replace(/[^0-9.]/g,'')) || 0;
+                // Restar cargo previo si existía, para no duplicar
+                var cargoPrevio = Number(p.cargoServicio) || 0;
+                var baseProductos = totalProductos - cargoPrevio;
+                var nuevoTotal = baseProductos + cargoAplicar;
+                cambios.cargoServicio = cargoAplicar;
+                cambios.totalNum = nuevoTotal;
+                cambios.total = '$' + nuevoTotal.toFixed(2);
+            }
+            tx.update(ref, cambios);
+        });
+        var msgTarifa = cargoAplicar != null ? (' Envío: $' + cargoAplicar) : '';
+        if (window.ttAlert) window.ttAlert('✅ ¡Pedido aceptado! Ya está en tu ruta.' + msgTarifa);
+    } catch(err) {
+        if (err.message === 'ya-tomado') {
+            if (window.ttAlert) window.ttAlert('😕 Otro repartidor tomó este pedido primero.');
+        } else {
+            alert('No se pudo aceptar. Revisa tu conexión e intenta de nuevo.');
+        }
+    }
+};
+
+// ── Escuchar pedidos disponibles ──
+let _ultimaLista = [];
+// Mostrar la foto de referencia del cliente con botón abrir/cerrar
+function _fotoReferencia(p) {
+    if (!p.fotoReferencia) return '';
+    var pid = String(p.id || Math.random()).replace(/[^a-zA-Z0-9]/g,'');
+    return '<div style="margin:.4rem 0;">' +
+           '<button onclick="_toggleFoto(\'' + pid + '\')" style="width:100%;padding:.5rem .7rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-family:inherit;font-weight:700;font-size:.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.3rem;">' +
+           '<span id="foto-icon-' + pid + '">📸</span> <span id="foto-txt-' + pid + '">Ver foto de referencia</span>' +
+           '</button>' +
+           '<div id="foto-cont-' + pid + '" style="display:none;margin-top:.5rem;">' +
+           '<img src="' + p.fotoReferencia + '" alt="Referencia" style="width:100%;border-radius:8px;" onclick="window.open(this.src)">' +
+           '</div>' +
+           '</div>';
+}
+
+// Alternar mostrar/ocultar la foto de referencia
+window._toggleFoto = function(pid) {
+    var cont = document.getElementById('foto-cont-' + pid);
+    var txt = document.getElementById('foto-txt-' + pid);
+    var icon = document.getElementById('foto-icon-' + pid);
+    if (!cont) return;
+    if (cont.style.display === 'none') {
+        cont.style.display = 'block';
+        if (txt) txt.textContent = 'Ocultar foto';
+        if (icon) icon.textContent = '🔽';
+    } else {
+        cont.style.display = 'none';
+        if (txt) txt.textContent = 'Ver foto de referencia';
+        if (icon) icon.textContent = '📸';
+    }
+};
+
+// Mostrar la tarifa sugerida según el tiempo de llegada
+function _tarifaLinea(p) {
+    var tarifa = tarifaSugerida(p);
+    if (tarifa == null) return '';
+    if (tarifa === 'preguntar') {
+        return '<div class="pn-linea" style="color:#FBB724;font-weight:700;">💵 Envío: a convenir (más de 1 hora)</div>';
+    }
+    var actual = Number(p.cargoServicio) || 0;
+    var aviso = '';
+    if (actual && actual !== tarifa) {
+        aviso = ' <span style="color:#888;font-size:.8em;">(actual: $' + actual + ')</span>';
+    }
+    return '<div class="pn-linea" style="color:#25D366;font-weight:700;">💵 Envío sugerido: $' + tarifa + aviso + '</div>';
+}
+
+// Mostrar los productos ordenados (si la orden ya tiene items)
+function _listaProductos(p) {
+    // No mostrar si aún es solicitud pendiente sin productos
+    if (p.esSolicitudUnidad) return '';
+    var items = p.itemsData;
+    var html = '';
+    if (Array.isArray(items) && items.length) {
+        var _grupos = window.agruparItems ? window.agruparItems(items) : items.map(function(it){ it.cantidad = it.cantidad||1; return it; });
+        html = _grupos.map(function(g){
+            var nom = g.nombre || 'Producto';
+            var varTxt = g.variante ? ' (' + g.variante + ')' : '';
+            return '<div style="font-size:.8rem;color:#ccc;padding:.1rem 0;">• <b style="color:#FF7A33;">' + g.cantidad + '×</b> ' + nom + varTxt + '</div>';
+        }).join('');
+    } else if (p.items && typeof p.items === 'string' && p.items.indexOf('Pendiente') < 0) {
+        // Respaldo: items como texto
+        html = '<div style="font-size:.8rem;color:#ccc;">' + p.items + '</div>';
+    }
+    if (!html) return '';
+    return '<div style="background:rgba(255,255,255,.03);border-radius:8px;padding:.5rem .6rem;margin:.4rem 0;">' +
+           '<div style="font-size:.7rem;color:#888;text-transform:uppercase;font-weight:700;margin-bottom:.2rem;">🛍️ Orden del cliente</div>' +
+           html + '</div>';
+}
+
+// Formatear fecha/hora de ingreso de la orden
+function _fechaIngreso(p) {
+    var ts = null;
+    if (p.creado && p.creado.seconds) ts = p.creado.seconds * 1000;
+    else if (p.tiempos && p.tiempos.recibida) ts = p.tiempos.recibida;
+    else if (p.tomadaEn) ts = new Date(p.tomadaEn).getTime();
+    if (!ts) return '';
+    var d = new Date(ts);
+    var opts = { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' };
+    return d.toLocaleString('es-MX', opts);
+}
+
+function esDisponible(p) {
+    // Domicilio, sin repartidor, no archivado
+    const esDomicilio = (p.tipoEntrega === 'Domicilio') || (p.tipo === 'domicilio') || !!p.zonaEntregaNombre;
+    return esDomicilio && !p.repartidorId && p.archivado !== true;
+}
+
+// ── MAPA EN VIVO (tortumóvil + clientes) ──────────────────────
+
+function initMapaDisp() {
+    const est = document.getElementById('mapa-estado');
+    // PASO 1: ¿Cargó la librería Leaflet?
+    if (typeof L === 'undefined') {
+        initMapaDisp._intentos = (initMapaDisp._intentos || 0) + 1;
+        if (initMapaDisp._intentos <= 20) {
+            if (est) est.innerHTML = '⏳ Cargando librería del mapa… (intento ' + initMapaDisp._intentos + ')';
+            setTimeout(initMapaDisp, 500);
+            return;
+        }
+        if (est) est.innerHTML = '❌ PASO 1 falló: la librería Leaflet no cargó desde tu sitio.';
+        document.getElementById('mapa-disp').style.display = 'none';
+        return;
+    }
+    if (est) est.innerHTML = '✅ Librería OK · creando mapa…';
+
+    // PASO 2: Crear el mapa
+    try {
+        _mapa = L.map('mapa-disp', { zoomControl:true }).setView([29.4241, -98.4936], 12);
+    } catch(e) {
+        if (est) est.innerHTML = '❌ PASO 2 falló al crear el mapa: ' + (e.message||e);
+        return;
+    }
+
+    // PASO 3: Cargar las imágenes del mapa (tiles). Contar si cargan o fallan.
+    let tilesOk = 0, tilesFail = 0;
+    const capa = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'© OpenStreetMap', maxZoom:19
+    });
+    capa.on('tileload', function(){
+        tilesOk++;
+        if (tilesOk === 1 && est) est.innerHTML = '✅ Mapa cargando correctamente';
+    });
+    capa.on('tileerror', function(){
+        tilesFail++;
+        if (tilesFail >= 3 && tilesOk === 0 && est) {
+            est.innerHTML = '❌ PASO 3: las imágenes del mapa están BLOQUEADAS por tu red (tiles no cargan)';
+        }
+    });
+    capa.addTo(_mapa);
+    _capaClientes = L.layerGroup().addTo(_mapa);
+
+    // Forzar redibujado
+    [100, 400, 900, 1600, 2500, 4000].forEach(function(ms){
+        setTimeout(function(){ if(_mapa) _mapa.invalidateSize(); }, ms);
+    });
+    window.addEventListener('load', function(){ if(_mapa) _mapa.invalidateSize(); });
+    window.addEventListener('resize', function(){ if(_mapa) _mapa.invalidateSize(); });
+
+    iniciarUbicacion();
+}
+
+function iniciarUbicacion() {
+    const est = document.getElementById('mapa-estado');
+    if (!navigator.geolocation) {
+        est.className = 'mapa-estado';
+        est.innerHTML = '⚠️ Tu dispositivo no soporta ubicación';
+        return;
+    }
+
+    est.className = 'mapa-estado';
+    est.innerHTML = '📍 Activando tu ubicación…';
+
+    navigator.geolocation.watchPosition(function(pos){
+        _miPos = { lat:pos.coords.latitude, lng:pos.coords.longitude };
+        pintarYo();
+        est.className = 'mapa-estado ok';
+        est.innerHTML = '🚚 Tu tortumóvil está en el mapa · ubicación activa';
+        render(_ultimaLista);
+        if (_mapa) _mapa.invalidateSize();
+    }, function(err){
+        // Mensaje claro según el tipo de error
+        est.className = 'mapa-estado';
+        if (err.code === err.PERMISSION_DENIED) {
+            est.innerHTML = '🔒 Ubicación bloqueada · <span style="text-decoration:underline;cursor:pointer;" onclick="mostrarAyudaPermiso()">Toca aquí para activarla</span>';
+            avisarPermisoDenegado();
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+            est.innerHTML = '⚠️ No se pudo obtener tu ubicación · <span style="text-decoration:underline;cursor:pointer;" onclick="iniciarUbicacion()">Reintentar</span>';
+        } else if (err.code === err.TIMEOUT) {
+            est.innerHTML = '⏱️ Tardó mucho · <span style="text-decoration:underline;cursor:pointer;" onclick="iniciarUbicacion()">Reintentar</span>';
+        } else {
+            est.innerHTML = '⚠️ Activa el permiso de ubicación · <span style="text-decoration:underline;cursor:pointer;" onclick="iniciarUbicacion()">Reintentar</span>';
+        }
+    }, { enableHighAccuracy:true, maximumAge:5000, timeout:20000 });
+}
+window.iniciarUbicacion = iniciarUbicacion;
+
+// Aviso una sola vez cuando el permiso está denegado
+let _avisoPermisoMostrado = false;
+function avisarPermisoDenegado() {
+    if (_avisoPermisoMostrado) return;
+    _avisoPermisoMostrado = true;
+    mostrarAyudaPermiso();
+}
+
+window.mostrarAyudaPermiso = function() {
+    var msg = '📍 Para ver tu tortumóvil en el mapa y calcular distancias, necesitas ACTIVAR el permiso de ubicación.\n\n' +
+        'Cómo activarlo:\n' +
+        '1. Toca el candado 🔒 o la (i) junto a la dirección web (arriba)\n' +
+        '2. Busca "Ubicación" y ponlo en "Permitir"\n' +
+        '3. Recarga la página\n\n' +
+        'Si usas Chrome en Android: Ajustes del sitio → Ubicación → Permitir.';
+    if (window.ttAlert) window.ttAlert(msg); else alert(msg);
+};
+
+function pintarYo() {
+    if (!_mapa || !_miPos) return;
+    if (_marcadorYo) _mapa.removeLayer(_marcadorYo);
+    _marcadorYo = L.circleMarker([_miPos.lat, _miPos.lng], {
+        radius:9, color:'#fff', weight:2, fillColor:'#FF5A00', fillOpacity:1
+    }).addTo(_mapa).bindPopup('🚚 Tu tortumóvil');
+    // Centrar la primera vez
+    if (!_mapa._centradoYo) { _mapa.setView([_miPos.lat, _miPos.lng], 13); _mapa._centradoYo = true; }
+}
+
+// Distancia en línea recta (haversine) en km
+function distanciaKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Texto de distancia para un pedido (si hay ubicación del repartidor y del cliente)
+// ── Tiempo estimado de llegada (según distancia) ──
+function minutosEstimados(p) {
+    if (!_miPos) return null;
+    var lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+    var lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+    if (!lat || !lng) return null;
+    var km = distanciaKm(_miPos.lat, _miPos.lng, lat, lng);
+    var mi = km * 0.621371;
+    // Velocidad promedio urbana ~18.6 mph → minutos
+    var min = (mi / 18.6) * 60;
+    return Math.max(1, Math.round(min));
+}
+function textoTiempo(p) {
+    var min = minutosEstimados(p);
+    if (min == null) return '';
+    if (min < 60) return '~' + min + ' min';
+    var h = Math.floor(min/60), m = min%60;
+    return '~' + h + 'h' + (m ? ' ' + m + 'min' : '');
+}
+
+// ── Tarifa sugerida según tiempo de llegada ──
+// ≤15min $5 · ≤30min $10 · ≤1hr $20 · más: preguntar
+function tarifaSugerida(p) {
+    var min = minutosEstimados(p);
+    if (min == null) return null;
+    if (min <= 15) return 5;
+    if (min <= 30) return 10;
+    if (min <= 60) return 20;
+    return 'preguntar';
+}
+
+// ── Geocodificación inversa (Nominatim/OpenStreetMap) ──
+// Convierte lat/lng en dirección legible. Cachea para no repetir llamadas.
+window._cacheDirecciones = window._cacheDirecciones || {};
+async function obtenerDireccion(lat, lng) {
+    var clave = lat.toFixed(5) + ',' + lng.toFixed(5);
+    if (window._cacheDirecciones[clave]) {
+        var c = window._cacheDirecciones[clave];
+        return (typeof c === 'string') ? { texto: c, zona: null } : c;
+    }
+    try {
+        var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1';
+        var resp = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+        var data = await resp.json();
+        var a = data.address || {};
+        // Armar dirección corta: número + calle, colonia/barrio
+        var partes = [];
+        var calle = (a.house_number ? a.house_number + ' ' : '') + (a.road || a.pedestrian || '');
+        if (calle.trim()) partes.push(calle.trim());
+        var barrio = a.neighbourhood || a.suburb || a.quarter || a.residential || '';
+        if (barrio) partes.push(barrio);
+        var ciudad = a.city || a.town || a.village || '';
+        if (ciudad) partes.push(ciudad);
+        var texto = partes.join(', ') || (data.display_name || '').split(',').slice(0,2).join(',');
+        // Detectar zona automáticamente según ciudad/colonia
+        var zonaDetectada = _detectarZona(a);
+        var resultado = { texto: texto, zona: zonaDetectada };
+        window._cacheDirecciones[clave] = resultado;
+        return resultado;
+    } catch(e) {
+        console.warn('No se pudo obtener dirección:', e);
+        return { texto: '', zona: null };
+    }
+}
+
+// Detectar la zona conocida según la dirección de Nominatim
+function _detectarZona(a) {
+    var ciudad = ((a.city || a.town || a.village || '') + '').toLowerCase();
+    var barrio = ((a.neighbourhood || a.suburb || a.quarter || '') + '').toLowerCase();
+    var cp = (a.postcode || '') + '';
+    // Mapeo por ciudad conocida
+    if (ciudad.indexOf('converse') >= 0) return { id: 'converse', nombre: 'Converse' };
+    if (ciudad.indexOf('seguin') >= 0) return { id: 'seguin', nombre: 'Seguin' };
+    if (ciudad.indexOf('castroville') >= 0) return { id: 'castroville', nombre: 'Castroville' };
+    // Culebra es un área/road dentro de San Antonio
+    if (barrio.indexOf('culebra') >= 0) return { id: 'culebra', nombre: 'Culebra' };
+    // Código postal 78211 → Zona 211
+    if (cp.indexOf('78211') >= 0 || cp === '211') return { id: '211', nombre: 'Zona 211' };
+    // Por defecto, si es San Antonio
+    if (ciudad.indexOf('san antonio') >= 0) return { id: 'san-antonio', nombre: 'San Antonio' };
+    return null;
+}
+
+function textoDistancia(p) {
+    if (!_miPos) return '';
+    const lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+    const lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+    if (!lat || !lng) return '';
+    const km = distanciaKm(_miPos.lat, _miPos.lng, lat, lng);
+    const mi = km * 0.621371; // a millas (San Antonio, TX)
+    return mi < 0.2 ? 'muy cerca' : ('~' + mi.toFixed(1) + ' mi');
+}
+
+// Pinta los pines de los clientes con pedidos disponibles
+function pintarClientes(disp) {
+    if (!_mapa || !_capaClientes) return;
+    _capaClientes.clearLayers();
+    disp.forEach(p => {
+        const lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+        const lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+        if (!lat || !lng) return;
+        const dist = textoDistancia(p);
+        const tiempo = textoTiempo(p);
+        const marker = L.marker([lat, lng]).addTo(_capaClientes);
+        // Popup inicial (la dirección se carga en un momento)
+        var popupBase = '<b>' + (p.cliente||'Cliente') + '</b>' +
+                   (p.zonaEntregaNombre ? '<br>📍 ' + p.zonaEntregaNombre : '') +
+                   (dist ? '<br>🚗 ' + dist : '') +
+                   (tiempo ? '<br>⏱️ ' + tiempo : '') +
+                   '<br><span id="dir-' + p.id + '" style="color:#666;font-size:.85em;">📍 buscando dirección…</span>';
+        marker.bindPopup(popupBase);
+        // Cargar la dirección legible (Nominatim) y actualizar el popup
+        obtenerDireccion(lat, lng).then(function(res){
+            if (!res || !res.texto) return;
+            var zonaTxt = p.zonaEntregaNombre || (res.zona ? res.zona.nombre + ' (auto)' : '');
+            var nuevoPopup = '<b>' + (p.cliente||'Cliente') + '</b>' +
+                   (zonaTxt ? '<br>📍 ' + zonaTxt : '') +
+                   (dist ? '<br>🚗 ' + dist : '') +
+                   (tiempo ? '<br>⏱️ ' + tiempo : '') +
+                   '<br><span style="color:#333;font-size:.85em;">🏠 ' + res.texto + '</span>';
+            marker.setPopupContent(nuevoPopup);
+            p._direccionLegible = res.texto;
+            if (res.zona) p._zonaDetectada = res.zona;
+        });
+    });
+}
+
+function escuchar() {
+    onSnapshot(collection(db, 'pedidos'), snap => {
+        const todos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const disp = todos.filter(esDisponible);
+
+        // Detectar pedidos NUEVOS (no vistos antes) para disparar alarma
+        let hayNuevo = false;
+        disp.forEach(p => { if (!vistos.has(p.id)) { vistos.add(p.id); if (!primeraCarga) hayNuevo = true; } });
+        primeraCarga = false;
+
+        // Notificación del navegador si hay pedido nuevo
+        if (hayNuevo) _notificarNuevoPedido(disp.length);
+
+        // Pedidos disponibles que este repartidor NO ha descartado
+        const activos = disp.filter(p => !descartados.has(p.id));
+
+        // La alarma debe sonar MIENTRAS haya pedidos disponibles sin descartar
+        if (activos.length > 0) {
+            dispararAlarma();  // arranca (o mantiene) la alarma continua
+        } else {
+            detenerAlarma();   // no hay pedidos: silencio
+        }
+
+        _ultimaLista = disp;
+        render(disp);
+        pintarClientes(disp);
+    }, err => {
+        document.getElementById('lista-disp').innerHTML =
+            '<div class="vacio"><div class="emo">⚠️</div>No se pudo conectar. Revisa tu internet.</div>';
+    });
+}
+
+let _firmaRenderAnterior = '';
+function render(disp) {
+    const cont = document.getElementById('lista-disp');
+    // Quitar los que este repartidor descartó
+    const visibles = disp.filter(p => !descartados.has(p.id));
+
+    if (!visibles.length) {
+        detenerAlarma();
+        _firmaRenderAnterior = '';
+        cont.innerHTML = '<div class="vacio"><div class="emo">🕐</div>No hay pedidos disponibles ahora.<br>Cuando entre uno nuevo, sonará la alarma.</div>';
+        return;
+    }
+    // Más recientes primero
+    visibles.sort((a,b) => (b.folio||0) - (a.folio||0));
+
+    // Evitar reconstruir la lista si no cambió realmente (así no se cierra la foto abierta
+    // ni parpadea la tarjeta con cada actualización de Firebase).
+    var firma = visibles.map(function(p){
+        return p.id + '|' + (p.estado||'') + '|' + (p.total||'') + '|' + (p.repartidorId||'') + '|' + (p.fotoReferencia?'1':'0');
+    }).join('~');
+    if (firma === _firmaRenderAnterior) {
+        return;  // nada cambió — no reconstruir (mantiene la foto abierta)
+    }
+    _firmaRenderAnterior = firma;
+
+    cont.innerHTML = visibles.map(p => {
+        const folio = p.codigoOrden || (p.id ? p.id.slice(-4).toUpperCase() : (p.folioStr||''));
+        const zona = p.zonaEntregaNombre || 'Sin zona';
+        return '<div class="pedido-nuevo">' +
+            '<div class="pn-zona" id="pn-zona-' + p.id + '">📍 ' + zona + '</div>' +
+            (textoDistancia(p) ? '<span class="pn-distancia">🚗 ' + textoDistancia(p) + '</span>' : '') +
+            '<div class="pn-top">' +
+              '<div class="pn-cliente">' + (p.cliente || p.nombre || 'Cliente') + '</div>' +
+              '<div class="pn-total">' + (p.total || '') + '</div>' +
+            '</div>' +
+            (p.telefono ? '<div class="pn-linea">📞 <a href="tel:'+p.telefono+'">'+p.telefono+'</a></div>' : '') +
+            (textoTiempo(p) ? '<div class="pn-linea" style="color:#5B9BFF;">⏱️ Llegada aprox: ' + textoTiempo(p) + '</div>' : '') +
+            ((p.ubicacionCliente && p.ubicacionCliente.lat) ? '<div class="pn-linea" id="pn-dir-' + p.id + '" style="color:#aaa;font-size:.8rem;">🏠 buscando dirección…</div>' : '') +
+            _tarifaLinea(p) +
+            _listaProductos(p) +
+            _fotoReferencia(p) +
+            ((p.horarioAgendado || p.horarioEntregaEtiqueta) ? '<div class="pn-linea" style="color:#FBB724;font-weight:700;">🕐 Agendado: ' + (p.horarioAgendado || p.horarioEntregaEtiqueta) + '</div>' : '') +
+            '<div class="pn-linea" style="color:#888;">Orden #' + folio + '</div>' +
+            (_fechaIngreso(p) ? '<div class="pn-linea" style="color:#888;font-size:.75rem;">🕐 Ingresó: ' + _fechaIngreso(p) + '</div>' : '') +
+            (p.esSolicitudUnidad ? '<button onclick="tomarOrdenSolicitud(\'' + p.id + '\')" style="width:100%;margin-bottom:.5rem;padding:.85rem;border:none;background:linear-gradient(135deg,#FF7A33,#FF5A00);color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(255,90,0,.3);">📝 Tomar orden (abrir menú)</button>' : '') +
+            '<button class="btn-aceptar" onclick="aceptarPedido(\'' + p.id + '\')">✅ Aceptar este pedido</button>' +
+            '<button class="btn-descartar" onclick="descartarPedido(\'' + p.id + '\')">Ahora no (descartar)</button>' +
+            '<button onclick="abrirAsignarRepartidor(\'' + p.id + '\',\'' + folio + '\')" ' +
+              'style="width:100%;margin-top:.5rem;padding:.7rem;border:1px solid rgba(91,155,255,.4);' +
+              'background:rgba(91,155,255,.12);color:#5B9BFF;border-radius:10px;font-family:inherit;' +
+              'font-weight:700;font-size:.85rem;cursor:pointer;">🛵 Asignar a otro repartidor</button>' +
+        '</div>';
+    }).join('');
+
+    // Cargar las direcciones legibles en las tarjetas (async, después de renderizar)
+    visibles.forEach(function(p){
+        var lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+        var lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+        if (!lat || !lng) return;
+        var el = document.getElementById('pn-dir-' + p.id);
+        if (!el) return;
+        obtenerDireccion(lat, lng).then(function(res){
+            var el2 = document.getElementById('pn-dir-' + p.id);
+            if (el2 && res && res.texto) el2.innerHTML = '🏠 ' + res.texto;
+            else if (el2) el2.style.display = 'none';
+            // Actualizar la zona detectada en la tarjeta (si no tenía zona)
+            if (res && res.zona && !p.zonaEntregaNombre) {
+                var zonaEl = document.getElementById('pn-zona-' + p.id);
+                if (zonaEl) zonaEl.innerHTML = '📍 ' + res.zona.nombre + ' <span style="color:#888;font-size:.8em;">(auto)</span>';
+                p._zonaDetectada = res.zona;
+            }
+        });
+    });
+}
+</script>
+
+<!-- Modal asignar repartidor -->
+<div id="rep-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#1a1a1a;border-radius:16px;max-width:400px;width:100%;padding:1.3rem;box-shadow:0 10px 40px rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.1);">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <div style="font-size:1.05rem;font-weight:800;color:#fff;">🛵 Asignar repartidor <span id="rep-ticket" style="color:#FF7A33;"></span></div>
+      <button onclick="document.getElementById('rep-modal').style.display='none'" style="background:none;border:none;color:#888;font-size:1.4rem;cursor:pointer;">✕</button>
+    </div>
+    <div id="rep-lista" style="display:flex;flex-direction:column;gap:.5rem;max-height:50vh;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<script type="module">
+import { db } from '../js/firebase-config.js';
+import { collection, doc, getDocs, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+let _repPedidoId = null;
+
+window.abrirAsignarRepartidor = async function(id, ticket) {
+    _repPedidoId = id;
+    document.getElementById('rep-ticket').textContent = '#' + String(ticket).replace(/^#+/,'');
+    document.getElementById('rep-modal').style.display = 'flex';
+    var lista = document.getElementById('rep-lista');
+    lista.innerHTML = '<div style="color:#888;font-size:.82rem;text-align:center;padding:1rem;">Cargando repartidores…</div>';
+    try {
+        var snap = await getDocs(collection(db, 'empleados'));
+        var empleados = [];
+        snap.forEach(function(d){ var e = d.data(); e._docId = d.id; empleados.push(e); });
+        if (!empleados.length) {
+            lista.innerHTML = '<div style="color:#888;font-size:.82rem;text-align:center;padding:1rem;">No hay empleados registrados.</div>';
+            return;
+        }
+        lista.innerHTML = empleados.map(function(e){
+            var eid = e.empleadoId || e.id || e._docId;
+            var nombre = e.nombre || eid;
+            var rol = e.rol || 'empleado';
+            return '<button onclick="asignarRepartidor(\'' + eid + '\',\'' + String(nombre).replace(/'/g,"") + '\')" ' +
+                'style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:.7rem .9rem;' +
+                'background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.1);' +
+                'border-radius:10px;color:#fff;font-family:inherit;font-size:.85rem;font-weight:700;cursor:pointer;">' +
+                '<span>' + nombre + '</span>' +
+                '<span style="font-size:.68rem;color:#888;text-transform:capitalize;">' + rol + '</span>' +
+                '</button>';
+        }).join('');
+    } catch(err) {
+        lista.innerHTML = '<div style="color:#F44336;font-size:.82rem;text-align:center;padding:1rem;">Error cargando repartidores.</div>';
+    }
+};
+
+window.asignarRepartidor = async function(repId, repNombre) {
+    if (!_repPedidoId) return;
+    try {
+        // Transacción atómica: si otra persona ya asignó un repartidor a este
+        // pedido entre que se abrió el modal y ahora, NO lo pisamos. Evita que
+        // dos gerentes/repartidores tomen el mismo pedido a la vez.
+        await runTransaction(db, async (tx) => {
+            const ref = doc(db, 'pedidos', _repPedidoId);
+            const snap = await tx.get(ref);
+            if (!snap.exists()) throw new Error('no-existe');
+            const p = snap.data();
+            // Ya tiene repartidor y es OTRO → conflicto (si es el mismo, es idempotente)
+            if (p.repartidorId && String(p.repartidorId) !== String(repId)) {
+                const e = new Error('ya-tomado');
+                e.repartidorActual = p.repartidorNombre || p.repartidorId;
+                throw e;
+            }
+            tx.update(ref, {
+                repartidorId: String(repId),
+                repartidorNombre: repNombre,
+                repartidorAsignadoEn: new Date().toISOString(),
+                aceptadoPorRepartidor: true
+            });
+        });
+        document.getElementById('rep-modal').style.display = 'none';
+        if (window.ttAlert) window.ttAlert('✅ Repartidor asignado: ' + repNombre);
+    } catch(err) {
+        document.getElementById('rep-modal').style.display = 'none';
+        if (err && err.message === 'ya-tomado') {
+            const quien = err.repartidorActual ? (' (' + err.repartidorActual + ')') : '';
+            if (window.ttAlert) window.ttAlert('⚠️ Ese pedido ya fue tomado por otro repartidor' + quien + '. Se actualizó la lista.');
+            else alert('Ese pedido ya fue tomado por otro repartidor' + quien + '.');
+        } else if (err && err.message === 'no-existe') {
+            if (window.ttAlert) window.ttAlert('⚠️ Ese pedido ya no existe.');
+            else alert('Ese pedido ya no existe.');
+        } else {
+            alert('Error asignando repartidor.');
+        }
+    }
+};
+</script>
+<script type="module" src="../js/contador-disponibles.js?v=1787291222"></script>
+<script src="../js/perfil-barra.js?v=1788059171"></script>
+</body>
+</html>

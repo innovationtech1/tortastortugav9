@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache">
+<title>Diagnóstico Empleados - Tortas Tortuga</title>
+<style>
+  body { background:#0d0d0d; color:#fff; font-family:system-ui,sans-serif; padding:1.5rem; max-width:700px; margin:0 auto; }
+  h1 { color:#FF5A00; font-size:1.4rem; }
+  .card { background:#1a1a1a; border:1px solid #333; border-radius:14px; padding:1rem 1.2rem; margin-bottom:1rem; }
+  .emp { border-left:3px solid #25D366; padding:.8rem 1rem; margin-bottom:.8rem; background:rgba(255,255,255,.03); border-radius:8px; }
+  .emp-id { font-size:1.1rem; font-weight:800; color:#FBB724; }
+  .emp-row { font-size:.9rem; margin:.3rem 0; color:#ccc; }
+  .cred { background:rgba(37,211,102,.1); border:1px solid rgba(37,211,102,.3); border-radius:8px; padding:.6rem .8rem; margin-top:.5rem; }
+  .cred b { color:#25D366; }
+  .warn { color:#F44336; font-size:.85rem; }
+  button { background:#FF5A00; color:#fff; border:none; padding:.8rem 1.2rem; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; font-size:.95rem; }
+  .loading { color:#888; text-align:center; padding:2rem; }
+  code { background:#000; padding:2px 6px; border-radius:4px; color:#25D366; }
+</style>
+</head>
+<body>
+<h1>🔍 Diagnóstico del Portal de Empleados</h1>
+<p style="color:#aaa;font-size:.9rem;">Esta herramienta muestra los empleados registrados y sus credenciales para que puedas entrar.</p>
+
+<div class="card">
+  <button onclick="cargarEmpleados()">🔄 Cargar empleados registrados</button>
+  <div id="resultado"></div>
+</div>
+
+<div class="card" style="border-color:rgba(59,130,246,.3);">
+  <h3 style="color:#3B82F6;margin-top:0;">🧪 Probar la consulta exacta del login</h3>
+  <p style="font-size:.85rem;color:#ccc;">Corre la MISMA consulta que usa el portal para entrar, con el número y PIN que tú escribas.</p>
+  <input type="text" id="test-empid" placeholder="EMP-GERENTE" style="width:100%;padding:.6rem;margin-bottom:.5rem;background:#1C1C1C;border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;">
+  <input type="text" id="test-pin" placeholder="1234" style="width:100%;padding:.6rem;margin-bottom:.5rem;background:#1C1C1C;border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;">
+  <button onclick="probarConsultaLogin()">🧪 Probar</button>
+  <div id="resultado-test"></div>
+</div>
+
+<div class="card" style="border-color:rgba(255,90,0,.3);">
+  <h3 style="color:#FF5A00;margin-top:0;">👑 Cuenta de Gerente (EMP-GERENTE)</h3>
+  <p style="font-size:.85rem;color:#ccc;line-height:1.6;">Verifica si existe una cuenta activa de gerente con PIN <code>1234</code>. Si no existe, o el PIN no coincide, la crea/repara automáticamente sin borrar nada más.</p>
+  <button onclick="verificarGerente()">🔧 Verificar / Reparar cuenta de Gerente</button>
+  <div id="resultado-gerente"></div>
+</div>
+
+<div class="card">
+  <h3 style="color:#FBB724;margin-top:0;">📋 Cómo funciona el login</h3>
+  <p style="font-size:.88rem;line-height:1.6;color:#ccc;">
+    Para entrar al portal necesitas:<br>
+    • <b style="color:#fff;">Número de empleado</b> (ej: <code>EMP-001</code>)<br>
+    • <b style="color:#fff;">PIN de 4 dígitos</b><br><br>
+    La contraseña interna es: <code>EMP-XXX + PIN</code><br>
+    Ejemplo: EMP-001 con PIN 1234 → contraseña <code>EMP-0011234</code>
+  </p>
+</div>
+
+<script type="module">
+import { db, auth } from '../js/firebase-config.js';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, query, where }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updatePassword, signOut }
+  from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const GERENTE = {
+  empId: 'EMP-GERENTE',
+  pin: '1234',
+  email: 'emp-gerente@tortuga.local',
+  password: 'EMP-GERENTE1234',
+  nombre: 'Gerente',
+  apellido: 'Principal',
+  puesto: 'Gerente General',
+  rol: 'gerente',
+};
+
+window.cargarEmpleados = async function() {
+    const cont = document.getElementById('resultado');
+    cont.innerHTML = '<div class="loading">Cargando...</div>';
+
+    try {
+        const snap = await getDocs(collection(db, 'empleados'));
+
+        if (snap.empty) {
+            cont.innerHTML = '<p class="warn">⚠️ No hay empleados registrados en Firestore.<br>Necesitas registrar al menos uno en el portal de empleados.</p>';
+            return;
+        }
+
+        let html = '<h3 style="color:#25D366;">✅ ' + snap.size + ' empleado(s) encontrado(s):</h3>';
+        snap.forEach(function(doc) {
+            const e = doc.data();
+            const empId = e.empleadoId || 'SIN-ID';
+            const pin = e.pin || '????';
+            const nombre = (e.nombre || '') + ' ' + (e.apellido || '');
+            const rol = e.rol || e.puesto || 'cajero';
+
+            html += '<div class="emp">';
+            html += '<div class="emp-id">' + empId + '</div>';
+            html += '<div class="emp-row">👤 ' + nombre.trim() + ' — <span style="color:#A78BFA;">' + rol + '</span></div>';
+            html += '<div class="emp-row">📧 ' + (e.email || '(sin email)') + '</div>';
+            html += '<div class="emp-row">📞 ' + (e.telefono || '(sin teléfono)') + '</div>';
+            html += '<div class="emp-row">Estado: ' + (e.estado || 'activo') + '</div>';
+            html += '<div class="emp-row" style="color:#666;font-size:.72rem;">🔬 empleadoId: ' +
+                JSON.stringify(empId) + ' (' + empId.length + ' car.) · pin: ' +
+                JSON.stringify(pin) + ' (' + String(pin).length + ' car.)</div>';
+            html += '<div class="cred">';
+            html += 'Para entrar usa:<br>';
+            html += 'Número: <b>' + empId + '</b><br>';
+            html += 'PIN: <b>' + pin + '</b>';
+            html += '</div>';
+            html += '</div>';
+        });
+
+        cont.innerHTML = html;
+    } catch(e) {
+        cont.innerHTML = '<p class="warn">Error al cargar: ' + e.message + '<br><br>Puede ser un problema de permisos de Firestore.</p>';
+        console.error(e);
+    }
+};
+
+window.probarConsultaLogin = async function() {
+    const cont = document.getElementById('resultado-test');
+    const empId = (document.getElementById('test-empid').value || '').trim().toUpperCase();
+    const pin = (document.getElementById('test-pin').value || '').replace(/\D/g,'');
+    cont.innerHTML = '<div class="loading">Probando...</div>';
+
+    try {
+        // Paso 1: solo por empleadoId (para ver si el ID en si coincide)
+        const q1 = query(collection(db,'empleados'), where('empleadoId','==', empId));
+        const s1 = await getDocs(q1);
+
+        // Paso 2: la consulta exacta y completa que usa el login
+        const q2 = query(collection(db,'empleados'), where('empleadoId','==', empId), where('pin','==', pin));
+        const s2 = await getDocs(q2);
+
+        let out = '<div class="cred">';
+        out += 'Buscando: empleadoId=' + JSON.stringify(empId) + ', pin=' + JSON.stringify(pin) + '<br><br>';
+        out += 'Paso 1 (solo empleadoId): ' + (s1.empty ? '❌ 0 resultados' : '✅ ' + s1.size + ' resultado(s)') + '<br>';
+        if (!s1.empty) {
+            s1.forEach(d => {
+                const data = d.data();
+                out += '&nbsp;&nbsp;→ doc <code>' + d.id + '</code>: pin real = ' + JSON.stringify(data.pin) + '<br>';
+            });
+        }
+        out += '<br>Paso 2 (empleadoId + pin, la consulta real del login): ' +
+            (s2.empty ? '❌ 0 resultados — AQUÍ ESTÁ EL PROBLEMA' : '✅ ' + s2.size + ' resultado(s) — debería dejarte entrar');
+        out += '</div>';
+        cont.innerHTML = out;
+    } catch(e) {
+        cont.innerHTML = '<p class="warn">❌ Error: ' + e.message + '</p>';
+        console.error(e);
+    }
+};
+
+window.verificarGerente = async function() {
+    const cont = document.getElementById('resultado-gerente');
+    cont.innerHTML = '<div class="loading">Verificando...</div>';
+    const pasos = [];
+
+    try {
+        // 1. Buscar el doc en Firestore por empleadoId
+        const q = query(collection(db, 'empleados'), where('empleadoId', '==', GERENTE.empId));
+        const snap = await getDocs(q);
+        let empDoc = snap.empty ? null : snap.docs[0];
+        let empData = empDoc ? empDoc.data() : null;
+
+        pasos.push(empDoc
+            ? '✅ Existe un registro EMP-GERENTE en Firestore (PIN actual: <b>' + (empData.pin || '????') + '</b>, rol: ' + (empData.rol || '?') + ')'
+            : '⚠️ No existe ningún registro EMP-GERENTE en Firestore.');
+
+        // 2. Intentar iniciar sesión con la cuenta de Firebase Auth esperada (esquema actual)
+        let cred = await signInWithEmailAndPassword(auth, GERENTE.email, GERENTE.password).catch(() => null);
+        let viaLegacy = false;
+
+        // 2b. Si falla, intentar con el esquema viejo (gerente@tortuga.local)
+        // que es el que aparece en tu Firestore actual
+        if (!cred && empData && empData.email && empData.email !== GERENTE.email) {
+            cred = await signInWithEmailAndPassword(auth, empData.email, 'GerenteTortuga2026').catch(() => null);
+            if (cred) viaLegacy = true;
+        }
+
+        if (cred) {
+            if (viaLegacy) pasos.push('✅ Entré con el correo viejo (' + empData.email + ') y la contraseña legacy.');
+            else pasos.push('✅ La cuenta de Firebase Auth (' + GERENTE.email + ') existe y el PIN 1234 es válido.');
+
+            // Ya autenticado — reparar TODO de una vez: email, PIN y contraseña real
+            const ref = doc(db, 'empleados', cred.user.uid);
+            const snapUid = await getDoc(ref);
+            if (!snapUid.exists()) {
+                await setDoc(ref, {
+                    uid: cred.user.uid, empleadoId: GERENTE.empId,
+                    nombre: GERENTE.nombre, apellido: GERENTE.apellido,
+                    email: GERENTE.email, telefono: '2100000000',
+                    puesto: GERENTE.puesto, rol: GERENTE.rol, pin: GERENTE.pin,
+                    salarioHora: 0, estado: 'activo', turnoActivo: false,
+                });
+                pasos.push('🔧 Le faltaba su registro en Firestore — creado.');
+            } else {
+                const d = snapUid.data();
+                const necesitaFix = d.pin !== GERENTE.pin || d.estado === 'inactivo' || d.email !== GERENTE.email;
+                if (necesitaFix) {
+                    await updateDoc(ref, { pin: GERENTE.pin, estado: 'activo', email: GERENTE.email });
+                    pasos.push('🔧 Corregí el PIN a 1234, el estado a activo, y el correo guardado en Firestore.');
+                }
+            }
+            // Si entramos por el esquema viejo, migrar la contraseña real al esquema nuevo
+            if (viaLegacy) {
+                try {
+                    await updatePassword(cred.user, GERENTE.password);
+                    pasos.push('🔧 Actualicé la contraseña real de Firebase Auth al esquema nuevo (EMP-GERENTE + PIN).');
+                } catch(ePw) {
+                    pasos.push('⚠️ No pude actualizar la contraseña real: ' + ePw.message);
+                }
+            }
+            await signOut(auth);
+        } else {
+            // No pudimos autenticarnos con ningún esquema conocido
+            if (empDoc) {
+                // Sin sesión real, las reglas de Firestore bloquean la escritura
+                // a propósito (nadie sin login puede tocar /empleados). Hay que
+                // arreglarlo manualmente desde Firebase Console esta vez.
+                try {
+                    await updateDoc(doc(db, 'empleados', empDoc.id), { pin: GERENTE.pin, estado: 'activo' });
+                    pasos.push('🔧 Encontré el registro y actualicé el PIN a 1234 y el estado a activo. Intenta entrar de nuevo con EMP-GERENTE + 1234.');
+                } catch(ePerm) {
+                    pasos.push(
+                        '❌ No pude autenticarme con ningún correo/contraseña conocido para esta cuenta, ' +
+                        'y las reglas de Firestore bloquean la escritura sin sesión (a propósito, por seguridad). ' +
+                        '<br><br>Arréglalo manualmente en <b>Firebase Console → Firestore Database → empleados → ' +
+                        (empDoc.id) + '</b>: cambia el campo <code>pin</code> a <code>1234</code> y ' +
+                        '<code>estado</code> a <code>activo</code>. Documento: <code>' + empDoc.id + '</code>.'
+                    );
+                }
+            } else {
+                // No hay nada — crear todo desde cero
+                const newCred = await createUserWithEmailAndPassword(auth, GERENTE.email, GERENTE.password);
+                await setDoc(doc(db, 'empleados', newCred.user.uid), {
+                    uid: newCred.user.uid, empleadoId: GERENTE.empId,
+                    nombre: GERENTE.nombre, apellido: GERENTE.apellido,
+                    email: GERENTE.email, telefono: '2100000000',
+                    puesto: GERENTE.puesto, rol: GERENTE.rol, pin: GERENTE.pin,
+                    salarioHora: 0, estado: 'activo', turnoActivo: false,
+                });
+                await signOut(auth);
+                pasos.push('🔧 No existía nada — creé la cuenta desde cero: EMP-GERENTE / PIN 1234.');
+            }
+        }
+
+        cont.innerHTML = '<div class="cred">' + pasos.join('<br>') + '<br><br>✅ Listo. Intenta entrar con <b>EMP-GERENTE</b> y PIN <b>1234</b>.</div>';
+    } catch(e) {
+        cont.innerHTML = '<p class="warn">❌ Error: ' + e.message + '<br>Código: ' + (e.code || 'desconocido') + '</p>';
+        console.error(e);
+    }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Entrar - Tortas Tortuga</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/auth.css">
+<style>
+  /* Ajustes especificos para el login por telefono */
+  .paso { display:none; }
+  .paso.activo { display:block; }
+  .code-input { text-align:center !important; font-size:1.8rem !important; letter-spacing:.5rem !important; font-weight:800 !important; }
+  .codigo-demo {
+    background:rgba(251,183,36,.1); border:1px solid rgba(251,183,36,.3);
+    border-radius:12px; padding:.9rem; margin-bottom:1rem; text-align:center;
+  }
+  .codigo-demo .cd-label { font-size:.7rem; color:#FBB724; text-transform:uppercase; letter-spacing:.05em; font-weight:700; }
+  .codigo-demo .cd-code { font-size:1.8rem; font-weight:900; color:#FBB724; letter-spacing:.4rem; margin-top:.2rem; }
+  .intro-badge, .demo-badge {
+    background:rgba(167,139,250,.12); border:1px solid rgba(167,139,250,.3);
+    color:#A78BFA; font-size:.68rem; padding:.35rem .8rem; border-radius:20px;
+    display:inline-block; margin:0 auto 1rem; font-weight:700;
+  }
+  .btn-volver { background:none !important; box-shadow:none !important; color:#888 !important; font-size:.85rem !important; font-weight:600 !important; margin-top:.6rem !important; }
+  .modo-tabs { display:flex; gap:.4rem; margin-bottom:1.1rem; background:rgba(255,255,255,.04); border-radius:12px; padding:.3rem; }
+  .modo-tab { flex:1; background:none; border:none; color:#888; font-family:inherit; font-size:.78rem; font-weight:700; padding:.6rem .4rem; border-radius:9px; cursor:pointer; transition:.15s; }
+  .modo-tab.activo { background:rgba(255,90,0,.15); color:#FF5A00; }
+  .cuenta-tabs { display:flex; gap:.4rem; margin-bottom:1rem; }
+  .cuenta-tab { flex:1; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.1); color:#999; font-family:inherit; font-size:.82rem; font-weight:700; padding:.55rem; border-radius:9px; cursor:pointer; }
+  .cuenta-tab.activo { border-color:#FF5A00; color:#FF5A00; background:rgba(255,90,0,.08); }
+  .cuenta-paso { display:none; }
+  .cuenta-paso.activo { display:block; }
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<div class="auth-bg">
+    <div class="auth-card">
+
+        <div class="auth-logo">
+            <span class="logo-emoji">🐢</span>
+            <h1 class="logo-text">Tortas Tortuga</h1>
+            <p class="logo-sub">Entra para ordenar</p>
+        </div>
+
+        <!-- Botón Ver mi pedido (solo si el cliente ya ordenó) -->
+        <div id="ver-mi-pedido-wrap" style="display:none;margin-bottom:1rem;">
+            <button type="button" onclick="irAMiPedido()" style="width:100%;padding:.85rem;background:linear-gradient(135deg,#25D366,#18a849);border:none;color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(37,211,102,.3);">🛍️ Ver mi pedido</button>
+        </div>
+
+        
+
+        <div id="modo-telefono-wrap">
+        <div style="text-align:center;">
+            <span class="intro-badge" style="display:inline-block;background:rgba(255,90,0,.12);border:1px solid rgba(255,90,0,.25);color:#FF7A33;font-size:.8rem;font-weight:600;padding:.4rem .9rem;border-radius:20px;">🐢 Entra con tu nombre y teléfono</span>
+        </div>
+
+        <!-- PASO 1: Telefono -->
+        <div id="paso-telefono" class="paso activo">
+            <div class="field-wrap">
+                <label class="field-label">Tu nombre</label>
+                <input type="text" id="nombre" class="field-input" placeholder="Ej: Juan" autocomplete="off">
+            </div>
+
+            <div class="field-wrap">
+                <label class="field-label">Tu teléfono</label>
+                <input type="tel" id="telefono" class="field-input" inputmode="tel" placeholder="210-555-1234" autocomplete="off">
+            </div>
+
+            <div id="status-1" class="auth-message" style="display:none;"></div>
+
+            <button class="btn-primary" onclick="enviarCodigo()" id="btn-enviar">
+                <span class="btn-text">Entrar a ordenar</span>
+            </button>
+        </div>
+
+                <!-- PASO 2: Ubicación -->
+                <div id="paso-ubicacion" class="paso">
+                    <!-- Panel de opciones si el cliente YA tiene pedidos activos -->
+                    <div id="panel-tiene-pedidos" style="display:none;margin-bottom:1rem;">
+                        <div style="text-align:center;margin-bottom:1rem;">
+                            <div style="font-size:2rem;margin-bottom:.3rem;">👋</div>
+                            <div style="font-size:.95rem;color:#fff;font-weight:700;" id="ptp-saludo">¡Hola de nuevo!</div>
+                            <div style="font-size:.82rem;color:#aaa;margin-top:.3rem;" id="ptp-sub">Tienes pedidos activos. ¿Qué quieres hacer?</div>
+                        </div>
+                        <button type="button" onclick="irAVerMisPedidos()" style="width:100%;padding:.9rem;margin-bottom:.6rem;background:linear-gradient(135deg,#3B82F6,#2563EB);border:none;color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.92rem;cursor:pointer;">📦 Ver mis pedidos</button>
+                        <button type="button" onclick="hacerNuevoPedido()" style="width:100%;padding:.9rem;background:linear-gradient(135deg,#FF7A33,#FF5A00);border:none;color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.92rem;cursor:pointer;">📍 Hacer nuevo pedido</button>
+                    </div>
+
+                    <!-- Sección normal de compartir ubicación (se oculta si hay panel de pedidos) -->
+                    <div id="seccion-compartir-ubi">
+                    <div style="text-align:center;margin-bottom:1.2rem;">
+                        <div style="font-size:2.2rem;margin-bottom:.4rem;">📍</div>
+                        <div style="font-size:.95rem;color:#fff;font-weight:700;">¿Dónde te encuentras?</div>
+                        <div style="font-size:.82rem;color:#aaa;margin-top:.3rem;">
+                            Compártenos tu ubicación para llevarte tu orden más rápido.
+                        </div>
+                    </div>
+
+                    <div id="ubi-estado" style="background:rgba(255,90,0,.08);border:1px solid rgba(255,90,0,.25);border-radius:12px;padding:1rem;text-align:center;margin-bottom:1rem;">
+                        <div style="font-size:.85rem;color:#FF7A33;font-weight:700;">📡 Toca el botón para compartir tu ubicación</div>
+                    </div>
+
+                    <div id="ubi-mapa" style="display:none;height:180px;border-radius:12px;overflow:hidden;margin-bottom:1rem;"></div>
+
+                    <!-- Foto de referencia (opcional pero recomendada) -->
+                    <div id="foto-ref-seccion" style="display:none;background:rgba(91,155,255,.06);border:1px solid rgba(91,155,255,.25);border-radius:12px;padding:.9rem 1rem;margin-bottom:1rem;">
+                        <div style="font-size:.88rem;color:#5B9BFF;font-weight:800;margin-bottom:.3rem;">📸 Foto de referencia (opcional)</div>
+                        <div style="font-size:.8rem;color:#bbb;line-height:1.45;margin-bottom:.7rem;">Toma o sube una foto de tu casa, entrada o un punto de referencia para que el repartidor te encuentre más fácil.</div>
+                        <!-- Vista previa -->
+                        <div id="foto-ref-preview" style="display:none;margin-bottom:.7rem;">
+                            <div style="position:relative;">
+                                <img id="foto-ref-img" src="" alt="Foto de referencia" style="width:100%;max-height:200px;object-fit:cover;border-radius:10px;display:block;">
+                                <button type="button" onclick="quitarFotoRef()" style="position:absolute;top:.4rem;right:.4rem;background:rgba(0,0,0,.6);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>
+                            </div>
+                            <button type="button" onclick="volverATomar()" style="width:100%;margin-top:.5rem;padding:.7rem;background:rgba(255,90,0,.12);border:1px solid rgba(255,90,0,.35);color:#FF7A33;border-radius:10px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">🔄 Volver a tomar / cambiar foto</button>
+                        </div>
+                        <!-- Botones cámara y galería -->
+                        <!-- Visor de cámara en vivo (integrada en la página) -->
+                        <div id="foto-camara-visor" style="display:none;margin-bottom:.7rem;">
+                            <video id="foto-camara-video" autoplay playsinline style="width:100%;border-radius:10px;background:#000;max-height:280px;object-fit:cover;"></video>
+                            <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                                <button type="button" onclick="capturarFotoCamara()" style="flex:2;padding:.8rem;background:linear-gradient(135deg,#FF7A33,#FF5A00);border:none;color:#fff;border-radius:10px;font-family:inherit;font-weight:800;font-size:.9rem;cursor:pointer;">📸 Capturar</button>
+                                <button type="button" onclick="girarCamara()" title="Girar cámara" style="flex:1;padding:.8rem;background:rgba(91,155,255,.15);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:10px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">🔄 Girar</button>
+                                <button type="button" onclick="cerrarCamara()" style="flex:1;padding:.8rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:10px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">Cancelar</button>
+                            </div>
+                        </div>
+
+                        <div id="foto-ref-botones" style="display:flex;gap:.5rem;">
+                            <button type="button" onclick="abrirCamara()" style="flex:1;text-align:center;padding:.8rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:10px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:inherit;">
+                                📷 Cámara
+                            </button>
+                            <label style="flex:1;text-align:center;padding:.8rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:10px;font-weight:700;font-size:.88rem;cursor:pointer;">
+                                🖼️ Galería
+                                <input type="file" accept="image/*" onchange="procesarFotoRef(this)" style="display:none;">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Aviso del cargo de servicio (aparece con el horario) -->
+                    <div id="cargo-aviso" style="display:none;background:rgba(251,183,36,.1);border:1px solid rgba(251,183,36,.35);border-radius:12px;padding:.9rem 1rem;margin-bottom:1rem;">
+                        <div style="font-size:.9rem;color:#FBB724;font-weight:800;margin-bottom:.3rem;">🛵 Pedir tortumóvil a tu ubicación</div>
+                        <div style="font-size:.82rem;color:#ddd;line-height:1.5;">
+                            Una unidad irá a tu ubicación lo antes posible. Un repartidor te llamará para confirmar tu orden.
+                        </div>
+                        <div style="font-size:.95rem;color:#25D366;font-weight:800;margin-top:.5rem;">💵 Costo del servicio: $5.00 USD</div>
+                        <div style="font-size:.78rem;color:#FBB724;margin-top:.35rem;">➕ Lo que ordenes se cobra aparte (además de los $5).</div>
+                    </div>
+
+                    <div id="status-2" class="auth-message" style="display:none;"></div>
+
+                    <button class="btn-primary" onclick="compartirMiUbicacion()" id="btn-ubicacion">
+                        <span class="btn-text">📍 Compartir mi ubicación</span>
+                    </button>
+                    <button class="btn-primary btn-volver" onclick="volverPaso1()">← Cambiar datos</button>
+                </div>
+                </div><!-- /seccion-compartir-ubi -->
+        </div>
+
+        <!-- MODO CUENTA (email + contraseña, Firebase Auth real) -->
+        
+
+        
+
+    </div>
+</div>
+
+<script src="../js/estados.js?v=1788145000"></script>
+<script type="module">
+import { auth, db } from '../js/firebase-config.js';
+import { doc, setDoc, getDoc, getDocs, collection, query, where, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import {
+    createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    sendPasswordResetEmail, updateProfile
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+let _codigoGenerado = null;
+let _datosCliente = null;
+
+function showStatus(id, msg, tipo) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = msg;
+    el.className = 'auth-message ' + (tipo || '');
+    el.style.color = tipo === 'error' ? '#F44336' : (tipo === 'success' ? '#25D366' : '#FBB724');
+    el.style.display = 'block';
+}
+
+/* ── Selector Telefono / Cuenta ─────────────────────────────── */
+window.cambiarModo = function(modo) {
+    // Solo modo teléfono (opción de email eliminada)
+    var wrap = document.getElementById('modo-telefono-wrap');
+    if (wrap) wrap.style.display = 'block';
+};
+
+window.cambiarCuentaTab = function(tab) {
+    ['login','registro','recuperar'].forEach(function(t) {
+        var el = document.getElementById('cuenta-' + t);
+        if (el) el.classList.toggle('activo', t === tab);
+    });
+    document.getElementById('tab-login')?.classList.toggle('activo', tab === 'login');
+    document.getElementById('tab-registro')?.classList.toggle('activo', tab === 'registro');
+};
+
+window.mostrarRecuperar = function() { window.cambiarCuentaTab('recuperar'); };
+
+/* ── Guardar sesion de cliente (comun a telefono y cuenta) ──── */
+function guardarSesionCliente(nombre, telefono, uid) {
+    sessionStorage.setItem('tt_cliente_nombre', nombre);
+    sessionStorage.setItem('tt_cliente_telefono', telefono || '');
+    sessionStorage.setItem('tt_cliente_ts', Date.now().toString());
+    if (uid) sessionStorage.setItem('tt_cliente_uid', uid);
+    else sessionStorage.removeItem('tt_cliente_uid');
+    // Duplicar en localStorage: se comparte entre pestañas, y "Mi Pedido"
+    // se abre en pestaña nueva donde sessionStorage no está disponible.
+    localStorage.setItem('tt_cliente_nombre', nombre);
+    localStorage.setItem('tt_cliente_telefono', telefono || '');
+    localStorage.setItem('tt_cliente_ts', Date.now().toString());
+    if (uid) localStorage.setItem('tt_cliente_uid', uid);
+    else localStorage.removeItem('tt_cliente_uid');
+}
+
+/* ── LOGIN POR TELEFONO (verificacion por codigo) ──────── */
+// Teléfonos obviamente falsos que rechazamos
+const TELEFONOS_FALSOS = ['0000000000','1111111111','2222222222','3333333333',
+    '4444444444','5555555555','6666666666','7777777777','8888888888','9999999999',
+    '1234567890','0123456789'];
+const MAX_PEDIDOS_ACTIVOS = 5; // límite anti-spam por teléfono
+
+window.enviarCodigo = async function() {
+    const nombre = (document.getElementById('nombre').value || '').trim();
+    const tel = (document.getElementById('telefono').value || '').trim();
+    const soloDigitos = tel.replace(/[^0-9]/g, '');
+
+    // ── Validaciones al estilo Tortas Tortuga ──
+    // 1a. Nombre vacío
+    if (!nombre) {
+        showStatus('status-1', '🐢 ¡Hola! Primero dinos tu nombre para saludarte bien.', 'error');
+        document.getElementById('nombre').focus();
+        return;
+    }
+    // 1b. Nombre muy corto / sin letras reales
+    const letras = (nombre.match(/[a-zA-ZáéíóúñÁÉÍÓÚÑ]/g) || []).length;
+    if (letras < 2) {
+        showStatus('status-1', '🐢 Ese nombre está muy cortito. Escríbelo completo porfa.', 'error');
+        document.getElementById('nombre').focus();
+        return;
+    }
+    // 2a. Teléfono vacío
+    if (!soloDigitos) {
+        showStatus('status-1', '📱 Nos falta tu teléfono para avisarte cuando esté tu orden.', 'error');
+        document.getElementById('telefono').focus();
+        return;
+    }
+    // 2b. Teléfono incompleto
+    if (soloDigitos.length !== 10) {
+        showStatus('status-1', '📱 Tu teléfono debe tener 10 dígitos. Revísalo tantito.', 'error');
+        document.getElementById('telefono').focus();
+        return;
+    }
+    // 3. Rechazar teléfonos obviamente falsos
+    if (TELEFONOS_FALSOS.indexOf(soloDigitos) >= 0) {
+        showStatus('status-1', '🤔 Ese número no nos convence. Usa tu teléfono real para avisarte de tu orden.', 'error'); return;
+    }
+    // 4. No puede empezar en 0 o 1 (los códigos de área de EE.UU. no lo hacen)
+    if (soloDigitos[0] === '0' || soloDigitos[0] === '1') {
+        showStatus('status-1', '📞 Revisa tu teléfono, parece que le falta algo.', 'error'); return;
+    }
+
+    showStatus('status-1', 'Entrando…', 'info');
+
+    // ── Anti-spam: límite de pedidos activos por teléfono ──
+    try {
+        const q = query(collection(db, 'pedidos'), where('telefono', '==', soloDigitos));
+        const snap = await getDocs(q);
+        let activos = 0;
+        snap.forEach(function(d){
+            const p = d.data();
+            // Cuenta como activo si no está archivado ni entregado
+            if (p.archivado !== true && !TTEstados.estaEntregado(p.estado)) activos++;
+        });
+        if (activos >= MAX_PEDIDOS_ACTIVOS) {
+            showStatus('status-1', 'Tienes muchos pedidos en proceso. Espera a que se completen antes de pedir más.', 'error');
+            return;
+        }
+    } catch(e) {
+        // Si falla la verificación (ej. sin conexión), dejamos pasar — la revisión final la hace el admin
+        console.warn('No se pudo verificar límite de pedidos:', e);
+    }
+
+    // ── Guardar/actualizar cliente y reconocer si ya existía ──
+    let clienteConocido = false;
+    try {
+        const clienteId = 'cliente_' + soloDigitos;
+        const ref = doc(db, 'clientes', clienteId);
+        const existente = await getDoc(ref);
+        if (existente.exists()) clienteConocido = true;
+        await setDoc(ref, {
+            nombre: nombre,
+            telefono: soloDigitos,
+            ultimoAcceso: new Date().toISOString(),
+            visitas: ((existente.exists() && existente.data().visitas) || 0) + 1,
+        }, { merge: true });
+    } catch(e) {
+        console.warn('No se pudo guardar el cliente:', e);
+    }
+
+    // ── Guardar datos y pasar al paso de UBICACIÓN ──
+    // (Sin SMS). Guardamos la sesión ya; la ubicación es el siguiente paso.
+    guardarSesionCliente(nombre, soloDigitos, null);
+    _datosCliente = { nombre: nombre, telefono: soloDigitos, conocido: clienteConocido };
+    // Pasar al paso de ubicación
+    document.getElementById('paso-telefono').classList.remove('activo');
+    document.getElementById('paso-ubicacion').classList.add('activo');
+                try { sessionStorage.setItem('tt_paso_activo', 'ubicacion'); } catch(e){}
+    // Revisar si el cliente ya tiene pedidos ACTIVOS para mostrar opciones
+    _revisarPedidosActivos(soloDigitos);
+}
+
+// ── Detectar pedidos activos del cliente (no entregados) ──
+async function _revisarPedidosActivos(telefono) {
+    try {
+        var tel = String(telefono || '').replace(/[^0-9]/g,'');
+        if (!tel) return;
+        var qs = await getDocs(collection(db, 'pedidos'));
+        var activos = 0;
+        qs.forEach(function(d){
+            var p = d.data();
+            var t = String(p.telefono||'').replace(/[^0-9]/g,'');
+            if (t !== tel) return;
+            // Activo = NO entregado y NO cancelado
+            if (TTEstados.estaActivo(p.estado)) activos++;
+        });
+        if (activos > 0) {
+            var panel = document.getElementById('panel-tiene-pedidos');
+            var seccion = document.getElementById('seccion-compartir-ubi');
+            var sub = document.getElementById('ptp-sub');
+            if (sub) sub.textContent = 'Tienes ' + activos + (activos === 1 ? ' pedido activo' : ' pedidos activos') + '. ¿Qué quieres hacer?';
+            if (panel) panel.style.display = 'block';
+            if (seccion) seccion.style.display = 'none';
+        }
+    } catch(e) { console.warn('No se pudo revisar pedidos activos:', e); }
+}
+
+// Ver mis pedidos → ir a mi-pedido.html
+window.irAVerMisPedidos = function() {
+    window.location.href = 'mi-pedido.html';
+};
+
+// Hacer nuevo pedido → mostrar la sección de compartir ubicación
+window.hacerNuevoPedido = function() {
+    var panel = document.getElementById('panel-tiene-pedidos');
+    var seccion = document.getElementById('seccion-compartir-ubi');
+    if (panel) panel.style.display = 'none';
+    if (seccion) seccion.style.display = 'block';
+};
+
+// ── Compartir ubicación GPS y entrar ──
+// ── Foto de referencia (opcional): procesar, comprimir y guardar ──
+window._fotoRefData = null;  // guardará la foto comprimida en base64
+
+// ── Cámara integrada en la página (getUserMedia) ──
+window._camaraStream = null;
+
+window.abrirCamara = async function() {
+    var visor = document.getElementById('foto-camara-visor');
+    var video = document.getElementById('foto-camara-video');
+    var botones = document.getElementById('foto-ref-botones');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Tu navegador no permite abrir la cámara. Usa la opción de Galería.');
+        return;
+    }
+    try {
+        // Usar la cámara seleccionada (por defecto trasera 'environment')
+        if (!window._camaraFacing) window._camaraFacing = 'environment';
+        var stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: window._camaraFacing } },
+            audio: false
+        });
+        window._camaraStream = stream;
+        if (video) { video.srcObject = stream; }
+        if (visor) visor.style.display = 'block';
+        if (botones) botones.style.display = 'none';
+    } catch(e) {
+        console.error('Error al abrir cámara:', e);
+        if (e.name === 'NotAllowedError') {
+            alert('No diste permiso para la cámara. Puedes usar la Galería o permitir el acceso en la configuración del navegador.');
+        } else {
+            alert('No se pudo abrir la cámara. Usa la opción de Galería.');
+        }
+    }
+};
+
+// Girar cámara: alterna entre trasera (environment) y frontal (user)
+window.girarCamara = async function() {
+    // Cambiar el modo
+    window._camaraFacing = (window._camaraFacing === 'user') ? 'environment' : 'user';
+    // Detener el stream actual
+    if (window._camaraStream) {
+        window._camaraStream.getTracks().forEach(function(t){ t.stop(); });
+        window._camaraStream = null;
+    }
+    var video = document.getElementById('foto-camara-video');
+    try {
+        var stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: window._camaraFacing } },
+            audio: false
+        });
+        window._camaraStream = stream;
+        if (video) video.srcObject = stream;
+    } catch(e) {
+        console.error('Error al girar cámara:', e);
+        // Si falla (ej. no hay cámara frontal), volver a la anterior
+        window._camaraFacing = (window._camaraFacing === 'user') ? 'environment' : 'user';
+        try {
+            var stream2 = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: { ideal: window._camaraFacing } },
+                audio: false
+            });
+            window._camaraStream = stream2;
+            if (video) video.srcObject = stream2;
+            alert('Este dispositivo solo tiene una cámara disponible.');
+        } catch(e2) {
+            alert('No se pudo cambiar de cámara.');
+        }
+    }
+};
+
+window.capturarFotoCamara = function() {
+    var video = document.getElementById('foto-camara-video');
+    if (!video || !video.videoWidth) { alert('La cámara aún no está lista, espera un momento.'); return; }
+    try {
+        // Dibujar el frame actual del video en un canvas
+        var canvas = document.createElement('canvas');
+        var maxW = 800;
+        var scale = Math.min(1, maxW / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        if (dataUrl.length > 700000) dataUrl = canvas.toDataURL('image/jpeg', 0.4);
+        // Guardar la foto (mismo flujo que galería)
+        window._fotoRefData = dataUrl;
+        try { localStorage.setItem('tt_foto_ref', dataUrl); } catch(e){}
+        try { sessionStorage.setItem('tt_foto_ref', dataUrl); } catch(e){}
+        // Cerrar la cámara y mostrar la vista previa
+        cerrarCamara();
+        _mostrarPreviewFoto(dataUrl);
+    } catch(e) {
+        console.error('Error al capturar:', e);
+        alert('No se pudo capturar la foto. Intenta de nuevo.');
+    }
+};
+
+window.cerrarCamara = function() {
+    // Detener el stream de la cámara (libera el hardware)
+    if (window._camaraStream) {
+        window._camaraStream.getTracks().forEach(function(t){ t.stop(); });
+        window._camaraStream = null;
+    }
+    var visor = document.getElementById('foto-camara-visor');
+    var video = document.getElementById('foto-camara-video');
+    var botones = document.getElementById('foto-ref-botones');
+    if (video) video.srcObject = null;
+    if (visor) visor.style.display = 'none';
+    // Solo mostrar botones si no hay foto tomada
+    if (botones && !window._fotoRefData) botones.style.display = 'flex';
+};
+
+// Mostrar la vista previa de la foto
+function _mostrarPreviewFoto(dataUrl) {
+    var prev = document.getElementById('foto-ref-preview');
+    var imgEl = document.getElementById('foto-ref-img');
+    var botones = document.getElementById('foto-ref-botones');
+    if (imgEl) imgEl.src = dataUrl;
+    if (prev) prev.style.display = 'block';
+    if (botones) botones.style.display = 'none';
+    window._fotoRefData = dataUrl;
+}
+
+window.procesarFotoRef = function(input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+
+    // Mostrar aviso de "procesando" de inmediato (feedback al usuario)
+    var botones = document.getElementById('foto-ref-botones');
+    if (botones) botones.innerHTML = '<div style="width:100%;text-align:center;color:#5B9BFF;font-weight:700;font-size:.85rem;padding:.5rem;">⏳ Procesando foto…</div>';
+
+    var reader = new FileReader();
+    reader.onerror = function() {
+        console.error('Error al leer el archivo');
+        _resetBotonesFoto();
+        alert('No se pudo leer la foto. Intenta de nuevo.');
+    };
+    reader.onload = function(e) {
+        try {
+            var img = new Image();
+            img.onerror = function() {
+                console.error('Error al cargar la imagen');
+                _resetBotonesFoto();
+                alert('No se pudo procesar la foto. Intenta de nuevo.');
+            };
+            img.onload = function() {
+                try {
+                    var canvas = document.createElement('canvas');
+                    var maxW = 800;
+                    var scale = Math.min(1, maxW / img.width);
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    var dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    if (dataUrl.length > 700000) {
+                        dataUrl = canvas.toDataURL('image/jpeg', 0.4);
+                    }
+                    window._fotoRefData = dataUrl;
+                    // Guardar en localStorage Y sessionStorage (doble respaldo)
+                    try { localStorage.setItem('tt_foto_ref', dataUrl); } catch(e){}
+                    try { sessionStorage.setItem('tt_foto_ref', dataUrl); } catch(e){}
+                    _restaurarBotonesFoto();
+                    _mostrarPreviewFoto(dataUrl);
+                } catch(err) {
+                    console.error('Error procesando canvas:', err);
+                    // Respaldo: usar la imagen original sin comprimir
+                    try {
+                        window._fotoRefData = e.target.result;
+                        localStorage.setItem('tt_foto_ref', e.target.result);
+                        _restaurarBotonesFoto();
+                        _mostrarPreviewFoto(e.target.result);
+                    } catch(e2) {
+                        _resetBotonesFoto();
+                        alert('La foto es muy grande. Intenta con otra.');
+                    }
+                }
+            };
+            img.src = e.target.result;
+        } catch(err) {
+            console.error('Error en onload:', err);
+            _resetBotonesFoto();
+        }
+    };
+    reader.readAsDataURL(file);
+};
+
+// Restaurar los botones de cámara/galería (con foto tomada, quedan ocultos por el preview)
+function _restaurarBotonesFoto() {
+    var botones = document.getElementById('foto-ref-botones');
+    if (botones) botones.innerHTML =
+        '<button type="button" onclick="abrirCamara()" style="flex:1;text-align:center;padding:.8rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:10px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:inherit;">📷 Cámara</button>' +
+        '<label style="flex:1;text-align:center;padding:.8rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:10px;font-weight:700;font-size:.88rem;cursor:pointer;">🖼️ Galería<input type="file" accept="image/*" onchange="procesarFotoRef(this)" style="display:none;"></label>';
+}
+function _resetBotonesFoto() { _restaurarBotonesFoto(); }
+
+// Volver a tomar: quita la foto actual y reabre el visor de cámara
+window.volverATomar = function() {
+    quitarFotoRef();       // limpia la foto actual y restaura los botones
+    setTimeout(function(){ abrirCamara(); }, 150);  // reabre el visor de cámara
+};
+
+window.quitarFotoRef = function() {
+    window._fotoRefData = null;
+    try { sessionStorage.removeItem('tt_foto_ref'); } catch(e){}
+    try { localStorage.removeItem('tt_foto_ref'); } catch(e){}
+    _restaurarBotonesFoto();
+    var prev = document.getElementById('foto-ref-preview');
+    var botones = document.getElementById('foto-ref-botones');
+    var imgEl = document.getElementById('foto-ref-img');
+    if (imgEl) imgEl.src = '';
+    if (prev) prev.style.display = 'none';
+    if (botones) botones.style.display = 'flex';
+};
+
+window.compartirMiUbicacion = function() {
+    var estadoEl = document.getElementById('ubi-estado');
+    var btnEl = document.getElementById('btn-ubicacion');
+    if (!navigator.geolocation) {
+        showStatus('status-2', 'Tu navegador no soporta ubicación. Puedes continuar sin ella.', 'error');
+        return;
+    }
+    if (estadoEl) estadoEl.innerHTML = '<div style="font-size:.85rem;color:#FF7A33;font-weight:700;">📡 Obteniendo tu ubicación…</div>';
+    if (btnEl) btnEl.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            var lat = pos.coords.latitude;
+            var lng = pos.coords.longitude;
+            var precision = Math.round(pos.coords.accuracy || 0);
+            // Guardar la ubicación en la sesión del cliente
+            var ubi = { lat: lat, lng: lng, precision: precision, compartidaEn: new Date().toISOString() };
+            try {
+                sessionStorage.setItem('tt_cliente_ubicacion', JSON.stringify(ubi));
+                localStorage.setItem('tt_cliente_ubicacion', JSON.stringify(ubi));
+            } catch(e) {}
+
+            if (estadoEl) estadoEl.innerHTML = '<div style="font-size:.85rem;color:#25D366;font-weight:700;">✅ Ubicación lista (±' + precision + 'm)</div>';
+            // Mini mapa de confirmación
+            var mapaEl = document.getElementById('ubi-mapa');
+            if (mapaEl) {
+                mapaEl.style.display = 'block';
+                mapaEl.innerHTML = '<iframe src="https://maps.google.com/maps?q=' + lat + ',' + lng + '&z=16&output=embed" style="width:100%;height:100%;border:0;"></iframe>';
+            }
+            // Mostrar el aviso del cargo (sin horario — es "lo antes posible")
+            var cargoEl = document.getElementById('cargo-aviso');
+            if (cargoEl) cargoEl.style.display = 'block';
+                    var fotoSecc = document.getElementById('foto-ref-seccion');
+                    if (fotoSecc) fotoSecc.style.display = 'block';
+            if (btnEl) { btnEl.innerHTML = '<span class="btn-text">🛵 Pedir tortumóvil ($5)</span>'; btnEl.disabled = false; btnEl.setAttribute('onclick', 'confirmarUbicacionYHorario()'); }
+            showStatus('status-2', 'Elige el horario y confirma tu solicitud.', 'info');
+        },
+        function(err) {
+            // Detectar el tipo de dispositivo para dar instrucciones específicas
+            var esIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            var esAndroid = /Android/i.test(navigator.userAgent);
+            var permisoDenegado = (err && err.code === 1); // PERMISSION_DENIED
+
+            var titulo = '📍 Necesitamos tu ubicación';
+            var instrucciones = '';
+
+            if (permisoDenegado) {
+                if (esIOS) {
+                    instrucciones = 'Tu ubicación está bloqueada. Para activarla:<br><br>' +
+                        '1️⃣ Abre <b>Ajustes</b> del iPhone<br>' +
+                        '2️⃣ Busca <b>Safari</b> (o tu navegador)<br>' +
+                        '3️⃣ Toca <b>Ubicación</b> → <b>Permitir</b><br>' +
+                        '4️⃣ Vuelve aquí y toca "Compartir mi ubicación"<br><br>' +
+                        '<span style="color:#888;">También revisa: Ajustes → Privacidad → Localización (que esté activada).</span>';
+                } else if (esAndroid) {
+                    instrucciones = 'Tu ubicación está bloqueada. Para activarla:<br><br>' +
+                        '1️⃣ Toca el 🔒 o ⓘ junto a la dirección web (arriba)<br>' +
+                        '2️⃣ Toca <b>Permisos</b> → <b>Ubicación</b> → <b>Permitir</b><br>' +
+                        '3️⃣ Vuelve aquí y toca "Compartir mi ubicación"<br><br>' +
+                        '<span style="color:#888;">Y revisa que el GPS del teléfono esté encendido.</span>';
+                } else {
+                    instrucciones = 'Activa el permiso de ubicación en tu navegador (toca el candado 🔒 junto a la dirección web) y vuelve a intentar.';
+                }
+            } else {
+                // Error no de permiso (GPS apagado, señal, timeout)
+                instrucciones = 'Asegúrate de tener el <b>GPS encendido</b> y buena señal, luego intenta de nuevo.<br><br>' +
+                    '<span style="color:#888;">Si no puedes, continúa sin ubicación y compártela después.</span>';
+            }
+
+            if (estadoEl) {
+                estadoEl.innerHTML = '<div style="font-size:.9rem;color:#F44336;font-weight:800;margin-bottom:.6rem;">' + titulo + '</div>' +
+                    '<div style="font-size:.82rem;color:#ddd;line-height:1.6;text-align:left;">' + instrucciones + '</div>';
+            }
+            showStatus('status-2', permisoDenegado ? 'Activa el permiso de ubicación siguiendo los pasos de arriba.' : 'No se pudo obtener tu ubicación. Revisa tu GPS.', 'error');
+            if (btnEl) btnEl.disabled = false;
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+};
+
+// Generar franjas de horario: 10:00am a 7:00pm, cada 45 min
+function _generarHorarios() {
+    var sel = document.getElementById('horario-select');
+    if (!sel || sel.options.length > 1) return; // ya generado
+    var inicio = 10 * 60;  // 10:00am en minutos
+    var fin = 19 * 60;     // 7:00pm en minutos
+    var paso = 45;
+    function fmt(min) {
+        var h = Math.floor(min / 60);
+        var m = min % 60;
+        var ampm = h >= 12 ? 'pm' : 'am';
+        var h12 = h % 12; if (h12 === 0) h12 = 12;
+        return h12 + ':' + (m < 10 ? '0' : '') + m + ampm;
+    }
+    // Si ya pasó la hora actual, empezar desde la próxima franja disponible
+    var ahora = new Date();
+    var minAhora = ahora.getHours() * 60 + ahora.getMinutes();
+    for (var t = inicio; t + paso <= fin + paso && t < fin; t += paso) {
+        // Saltar franjas que ya pasaron hoy (con 20 min de margen)
+        if (t < minAhora + 20) continue;
+        var etiqueta = fmt(t) + ' – ' + fmt(t + paso);
+        var op = document.createElement('option');
+        op.value = etiqueta;
+        op.textContent = etiqueta;
+        sel.appendChild(op);
+    }
+    // Si no quedan franjas hoy, ofrecer "Lo antes posible"
+    if (sel.options.length <= 1) {
+        var op = document.createElement('option');
+        op.value = 'Lo antes posible';
+        op.textContent = 'Lo antes posible (mañana)';
+        sel.appendChild(op);
+    }
+}
+
+// Confirmar y CREAR la solicitud de tortumóvil (entra a Pedidos Disponibles)
+window.confirmarUbicacionYHorario = async function() {
+    // Ya no se pide horario — el servicio es "lo antes posible"
+    var horario = 'Lo antes posible';
+    try {
+        sessionStorage.setItem('tt_cliente_horario', horario);
+        localStorage.setItem('tt_cliente_horario', horario);
+    } catch(e) {}
+
+    var btnEl = document.getElementById('btn-ubicacion');
+    if (btnEl) { btnEl.disabled = true; btnEl.innerHTML = '<span class="btn-text">Enviando solicitud…</span>'; }
+
+    // Leer datos del cliente y ubicación
+    var nombre = (_datosCliente && _datosCliente.nombre) || sessionStorage.getItem('tt_cliente_nombre') || '';
+    var telefono = (_datosCliente && _datosCliente.telefono) || sessionStorage.getItem('tt_cliente_telefono') || '';
+    var ubi = null;
+    try {
+        var u = sessionStorage.getItem('tt_cliente_ubicacion') || localStorage.getItem('tt_cliente_ubicacion');
+        ubi = u ? JSON.parse(u) : null;
+    } catch(e) {}
+
+    try {
+        // Obtener un folio secuencial simple (contador por fecha)
+        var folioNum = Date.now() % 100000; // folio simple único
+        // Crear la SOLICITUD de tortumóvil en 'pedidos'
+        await addDoc(collection(db, 'pedidos'), {
+            cliente: nombre,
+            nombre: nombre,
+            telefono: telefono,
+            tipoEntrega: 'Domicilio',
+            tipoServicio: 'Solicitud tortumóvil',
+            esSolicitudUnidad: true,       // marca especial: solo solicitud, sin productos aún
+            ubicacionCliente: ubi,
+            fotoReferencia: (window._fotoRefData || localStorage.getItem('tt_foto_ref') || sessionStorage.getItem('tt_foto_ref') || null),   // foto de referencia (opcional)
+            horarioAgendado: horario,
+            // Cargo de servicio de $5 (se sumará cuando el repartidor tome la orden)
+            cargoServicio: 5,
+            items: '(Pendiente — el repartidor tomará la orden)',
+            itemsData: [],
+            total: '$5.00',
+            totalNum: 5,
+            estado: 'Nuevo 🆕',
+            estadoPago: 'Por pagar',
+            folio: folioNum,
+            folioStr: '#' + String(folioNum).slice(-4),
+            archivado: false,
+            creado: serverTimestamp(),
+            tiempos: { recibida: Date.now() }
+        });
+
+        showStatus('status-2', '✅ ¡Solicitud enviada! Un repartidor te llamará pronto para confirmar tu orden. 🐢', 'success');
+        // Limpiar la foto y el paso guardado (ya se envió)
+        try {
+            sessionStorage.removeItem('tt_foto_ref');
+            localStorage.removeItem('tt_foto_ref');
+            sessionStorage.removeItem('tt_paso_activo');
+            window._fotoRefData = null;
+        } catch(e){}
+        // Mostrar pantalla de confirmación (no menú)
+        setTimeout(mostrarConfirmacionSolicitud, 800);
+    } catch(err) {
+        console.error(err);
+        showStatus('status-2', 'No se pudo enviar tu solicitud. Revisa tu conexión e intenta de nuevo.', 'error');
+        if (btnEl) { btnEl.disabled = false; btnEl.innerHTML = '<span class="btn-text">🛵 Pedir tortumóvil ($5)</span>'; }
+    }
+};
+
+// Pantalla de confirmación tras enviar la solicitud
+function mostrarConfirmacionSolicitud() {
+    var horario = sessionStorage.getItem('tt_cliente_horario') || '';
+    var cont = document.querySelector('.paso.activo') || document.getElementById('paso-ubicacion');
+    if (cont) {
+        cont.innerHTML =
+            '<div style="text-align:center;padding:1rem 0;">' +
+                '<div style="font-size:3rem;margin-bottom:.6rem;">🛵</div>' +
+                '<div style="font-size:1.1rem;color:#25D366;font-weight:800;margin-bottom:.5rem;">¡Solicitud enviada!</div>' +
+                '<div style="font-size:.9rem;color:#ddd;line-height:1.6;margin-bottom:1rem;">' +
+                    'Una tortumóvil irá a tu ubicación <b>lo antes posible</b>.<br>' +
+                    'Un repartidor te <b>llamará pronto</b> para tomar tu orden. 🐢' +
+                '</div>' +
+                '<div style="background:rgba(251,183,36,.1);border:1px solid rgba(251,183,36,.3);border-radius:12px;padding:.8rem;font-size:.82rem;color:#FBB724;">' +
+                    '💵 El servicio cuesta $5.00. Lo que ordenes se cobra aparte.' +
+                '</div>' +
+                '<button onclick="cerrarSolicitud()" style="width:100%;margin-top:1.2rem;padding:.9rem;border:none;border-radius:14px;background:linear-gradient(135deg,#FF7A33,#FF5A00);color:#fff;font-family:inherit;font-weight:800;font-size:.95rem;cursor:pointer;box-shadow:0 4px 12px rgba(255,90,0,.3);">✅ Entendido, cerrar</button>' +
+            '</div>';
+    }
+}
+
+// Cerrar la pantalla de solicitud (volver al inicio)
+window.cerrarSolicitud = function() {
+    window.location.href = '../index.html';
+};
+
+// Verificar el código ingresado
+window.verificarCodigoSMS = function() {
+    const ingresado = (document.getElementById('codigo-input').value || '').trim();
+    if (ingresado.length !== 4) {
+        showStatus('status-2', '🔢 Escribe los 4 dígitos que te enviamos.', 'error'); return;
+    }
+    if (ingresado !== _codigoGenerado) {
+        showStatus('status-2', '❌ Ese código no coincide. Revísalo e inténtalo de nuevo.', 'error'); return;
+    }
+    // Código correcto → entrar
+    const d = _datosCliente || {};
+    guardarSesionCliente(d.nombre, d.telefono, null);
+    const saludo = d.conocido ? ('¡Hola de nuevo, ' + d.nombre + '! 🐢') : ('¡Bienvenido, ' + d.nombre + '!');
+    showStatus('status-2', saludo, 'success');
+    setTimeout(function(){ window.location.href = '../ordenar.html'; }, 700);
+};
+
+// (Ya no se usa código; se conserva por compatibilidad si algo la llama)
+window.verificarCodigo = window.verificarCodigoSMS;
+
+window.volverPaso1 = function() {
+    const pc = document.getElementById('paso-ubicacion');
+    const pt = document.getElementById('paso-telefono');
+    if (pc) pc.classList.remove('activo');
+    if (pt) pt.classList.add('activo');
+    try { sessionStorage.removeItem('tt_paso_activo'); } catch(e){}
+    var s = document.getElementById('status-2');
+    if (s) s.style.display = 'none';
+};
+
+/* ── CUENTA CON EMAIL + CONTRASEÑA (Firebase Auth real) ─────── */
+window.loginConCuenta = async function() {
+    const email = (document.getElementById('login-email').value || '').trim();
+    const pass  = document.getElementById('login-pass').value;
+
+    if (!email || !pass) { showStatus('status-login', 'Completa email y contraseña', 'error'); return; }
+
+    showStatus('status-login', 'Entrando...', 'info');
+    try {
+        const cred = await signInWithEmailAndPassword(auth, email, pass);
+        let nombre = cred.user.displayName || email.split('@')[0];
+        let telefono = '';
+        try {
+            const snap = await getDoc(doc(db, 'usuarios', cred.user.uid));
+            if (snap.exists()) {
+                nombre = snap.data().nombre || nombre;
+                telefono = snap.data().telefono || '';
+            }
+        } catch(e) {}
+
+        guardarSesionCliente(nombre, telefono, cred.user.uid);
+        showStatus('status-login', '¡Bienvenido ' + nombre + '!', 'success');
+        setTimeout(function(){ window.location.href = '../ordenar.html'; }, 700);
+    } catch(e) {
+        const msgs = {
+            'auth/invalid-credential': 'Email o contraseña incorrectos.',
+            'auth/user-not-found': 'No existe una cuenta con ese email.',
+            'auth/wrong-password': 'Contraseña incorrecta.',
+            'auth/too-many-requests': 'Demasiados intentos. Espera un momento.',
+        };
+        showStatus('status-login', msgs[e.code] || 'Error al entrar. Intenta de nuevo.', 'error');
+    }
+};
+
+window.registrarCuenta = async function() {
+    const nombre = (document.getElementById('reg-nombre').value || '').trim();
+    const telefono = (document.getElementById('reg-telefono').value || '').replace(/[^0-9]/g, '');
+    const email = (document.getElementById('reg-email').value || '').trim();
+    const pass  = document.getElementById('reg-pass').value;
+
+    if (!nombre) { showStatus('status-registro', 'Escribe tu nombre', 'error'); return; }
+    if (!email) { showStatus('status-registro', 'Escribe tu email', 'error'); return; }
+    if (pass.length < 8) { showStatus('status-registro', 'La contraseña debe tener mínimo 8 caracteres', 'error'); return; }
+
+    showStatus('status-registro', 'Creando tu cuenta...', 'info');
+    try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        try { await updateProfile(cred.user, { displayName: nombre }); } catch(e) {}
+
+        // Privilegios basicos por defecto: rol 'cliente', activo, nunca admin.
+        await setDoc(doc(db, 'usuarios', cred.user.uid), {
+            nombre: nombre,
+            telefono: telefono || '',
+            email: email,
+            rol: 'cliente',
+            activo: true,
+            creadoEn: new Date().toISOString(),
+        });
+
+        guardarSesionCliente(nombre, telefono, cred.user.uid);
+        showStatus('status-registro', '¡Cuenta creada! Bienvenido ' + nombre, 'success');
+        setTimeout(function(){ window.location.href = '../ordenar.html'; }, 800);
+    } catch(e) {
+        const msgs = {
+            'auth/email-already-in-use': 'Ya existe una cuenta con ese email. Intenta iniciar sesión.',
+            'auth/invalid-email': 'El email no es válido.',
+            'auth/weak-password': 'La contraseña es muy débil.',
+        };
+        showStatus('status-registro', msgs[e.code] || 'Error al crear la cuenta. Intenta de nuevo.', 'error');
+    }
+};
+
+window.enviarRecuperacion = async function() {
+    const email = (document.getElementById('rec-email').value || '').trim();
+    if (!email) { showStatus('status-recuperar', 'Escribe tu email', 'error'); return; }
+
+    showStatus('status-recuperar', 'Enviando...', 'info');
+    try {
+        await sendPasswordResetEmail(auth, email);
+        showStatus('status-recuperar', 'Listo, revisa tu correo para el enlace de recuperación.', 'success');
+    } catch(e) {
+        const msgs = {
+            'auth/user-not-found': 'No existe una cuenta con ese email.',
+            'auth/invalid-email': 'El email no es válido.',
+        };
+        showStatus('status-recuperar', msgs[e.code] || 'No se pudo enviar el correo. Intenta de nuevo.', 'error');
+    }
+};
+
+// ── Restaurar el paso activo tras volver de la cámara/galería ──
+// Android puede recargar la página al abrir la cámara; restauramos el paso.
+(function _restaurarPaso() {
+    function restaurar() {
+        try {
+            var pasoGuardado = sessionStorage.getItem('tt_paso_activo');
+            var nombre = sessionStorage.getItem('tt_cliente_nombre');
+            if (pasoGuardado === 'ubicacion' && nombre) {
+                var pt = document.getElementById('paso-telefono');
+                var pc = document.getElementById('paso-ubicacion');
+                if (pt && pc) {
+                    pt.classList.remove('activo');
+                    pc.classList.add('activo');
+                    // Revisar pedidos activos al restaurar la sesión
+                    var _telRestaurar = sessionStorage.getItem('tt_cliente_telefono') || localStorage.getItem('tt_cliente_telefono');
+                    if (_telRestaurar && typeof _revisarPedidosActivos === 'function') _revisarPedidosActivos(_telRestaurar);
+                    // Restaurar la ubicación en el mapa si ya la tenía
+                    var uStr = sessionStorage.getItem('tt_cliente_ubicacion') || localStorage.getItem('tt_cliente_ubicacion');
+                    if (uStr) {
+                        try {
+                            var u = JSON.parse(uStr);
+                            var estadoEl = document.getElementById('ubi-estado');
+                            if (estadoEl) estadoEl.innerHTML = '<div style="font-size:.85rem;color:#25D366;font-weight:700;">✅ Ubicación lista (±' + (u.precision||0) + 'm)</div>';
+                            var mapaEl = document.getElementById('ubi-mapa');
+                            if (mapaEl) {
+                                mapaEl.style.display = 'block';
+                                mapaEl.innerHTML = '<iframe src="https://maps.google.com/maps?q=' + u.lat + ',' + u.lng + '&z=16&output=embed" style="width:100%;height:100%;border:0;"></iframe>';
+                            }
+                            var fotoSecc = document.getElementById('foto-ref-seccion');
+                            if (fotoSecc) fotoSecc.style.display = 'block';
+                            // Restaurar la foto de referencia si ya se había tomado
+                            try {
+                                var fotoGuardada = localStorage.getItem('tt_foto_ref') || sessionStorage.getItem('tt_foto_ref');
+                                if (fotoGuardada) {
+                                    window._fotoRefData = fotoGuardada;
+                                    if (typeof _mostrarPreviewFoto === 'function') _mostrarPreviewFoto(fotoGuardada);
+                                }
+                            } catch(e){}
+                            var cargoEl = document.getElementById('cargo-aviso');
+                            if (cargoEl) cargoEl.style.display = 'block';
+                            var btnEl = document.getElementById('btn-ubicacion');
+                            if (btnEl) { btnEl.innerHTML = '<span class="btn-text">🛵 Pedir tortumóvil ($5)</span>'; btnEl.disabled = false; btnEl.setAttribute('onclick', 'confirmarUbicacionYHorario()'); }
+                        } catch(e){}
+                    }
+                }
+            }
+        } catch(e){}
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', restaurar);
+    } else {
+        restaurar();
+    }
+})();
+
+// ── Botón "Ver mi pedido" (si el cliente ya tiene sesión) ──
+(function _mostrarVerMiPedido() {
+    try {
+        var tel = localStorage.getItem('tt_cliente_telefono') || sessionStorage.getItem('tt_cliente_telefono');
+        var wrap = document.getElementById('ver-mi-pedido-wrap');
+        if (tel && wrap) wrap.style.display = 'block';
+    } catch(e){}
+})();
+
+window.irAMiPedido = function() {
+    window.location.href = 'mi-pedido.html';
+};
+
+// ── Confirmación al retroceder (estilo Tortas Tortuga) ──
+(function _confirmarSalida() {
+    // Empujar un estado al historial para interceptar el botón atrás
+    try { history.pushState({ tt: true }, '', location.href); } catch(e){}
+    window.addEventListener('popstate', function(e) {
+        // Mostrar el modal de confirmación
+        _mostrarModalSalir();
+        // Volver a empujar el estado para no salir todavía
+        try { history.pushState({ tt: true }, '', location.href); } catch(e){}
+    });
+})();
+
+window._mostrarModalSalir = function() {
+    if (document.getElementById('tt-modal-salir')) return; // ya está abierto
+    var ov = document.createElement('div');
+    ov.id = 'tt-modal-salir';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+    ov.innerHTML =
+        '<div style="background:#1C1C1C;border:1px solid rgba(255,90,0,.3);border-radius:20px;padding:1.8rem 1.4rem;max-width:340px;width:100%;text-align:center;">' +
+            '<div style="font-size:3rem;margin-bottom:.5rem;">🐢</div>' +
+            '<div style="font-size:1.1rem;font-weight:900;color:#fff;margin-bottom:.4rem;">¿Estás seguro de salir?</div>' +
+            '<div style="font-size:.85rem;color:#bbb;margin-bottom:1.3rem;line-height:1.5;">Si sales, tendrás que volver a entrar para ordenar en Tortas Tortuga.</div>' +
+            '<div style="display:flex;gap:.6rem;">' +
+                '<button onclick="_cerrarModalSalir()" style="flex:1;padding:.85rem;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:12px;font-family:inherit;font-weight:700;font-size:.9rem;cursor:pointer;">Quedarme</button>' +
+                '<button onclick="_confirmarSalirApp()" style="flex:1;padding:.85rem;background:linear-gradient(135deg,#FF7A33,#FF5A00);border:none;color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.9rem;cursor:pointer;">Salir</button>' +
+            '</div>' +
+        '</div>';
+    document.body.appendChild(ov);
+};
+
+window._cerrarModalSalir = function() {
+    var ov = document.getElementById('tt-modal-salir');
+    if (ov) ov.remove();
+};
+
+window._confirmarSalirApp = function() {
+    _cerrarModalSalir();
+    // Intentar salir: retroceder dos veces (el estado que empujamos + el real)
+    history.go(-2);
+};
+
+</script>
+</body>
+</html>

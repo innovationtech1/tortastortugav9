@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta charset="UTF-8">
+<link rel="dns-prefetch" href="//firestore.googleapis.com">
+<link rel="preconnect" href="https://www.gstatic.com">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tortas Tortuga - San Antonio</title>
+    <meta name="description" content="Las mejores tortas de San Antonio, Texas. Menú, precios y pedidos por WhatsApp.">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/x-icon" href="/tortastortugav9/favicon.ico">
+<link rel="apple-touch-icon" href="/tortastortugav9/apple-touch-icon.png">
+<meta name="theme-color" content="#FF5A00">
+    <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="icons/icon-apple.png">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=1787193878">
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape shape-1"></div>
+        <div class="shape shape-2"></div>
+        <div class="shape shape-3"></div>
+        <div class="shape shape-4"></div>
+    </div>
+
+    <header>
+        <nav class="glass-nav">
+            <div class="logo">Tortas Tortuga</div>
+
+            <!-- Boton hamburguesa (solo movil) -->
+            <button class="hamburger" id="hamburger-btn" onclick="toggleMenu()" aria-label="Menú">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <ul class="nav-links" id="nav-links">
+                <li class="nav-panel-header">
+                    <span class="nav-panel-logo"><span class="emoji">🐢</span> Tortas Tortuga</span>
+                    <button class="nav-cerrar" onclick="cerrarMenu()" aria-label="Cerrar menú">✕</button>
+                </li>
+                <li><a href="#home" onclick="cerrarMenu()" data-i18n="nav.inicio">🏠 Inicio</a></li>
+                <li><a href="#menu" onclick="cerrarMenu()" data-i18n="nav.menu">📋 Menú</a></li>
+                <li><a href="#sides" onclick="cerrarMenu()" data-i18n="nav.extras">🍟 Extras</a></li>
+                <li class="nav-sep"></li>
+                <li><a href="pages/bienvenida.html" id="nav-login-link" class="cta-button" style="padding: 8px 20px; font-size: 0.9rem;">🔑 <span id="nav-login-text">Login</span></a></li>
+            </ul>
+
+            <!-- Fondo oscuro al abrir menu -->
+            <div class="nav-overlay" id="nav-overlay" onclick="cerrarMenu()"></div>
+        </nav>
+    </header>
+
+    <main>
+        <section id="home" class="hero">
+            <div class="hero-content glass-panel">
+                <h1 data-i18n="hero.titulo">Sabor a paso firme</h1>
+                <p class="hero-slogan" style="font-size:1.15rem;font-weight:700;color:#FF5A00;
+                   margin-bottom:.25rem;letter-spacing:.01em;">
+                   <span data-i18n="hero.eslogan">¡Para de sufrir, no se castigue! 🌶️</span>
+                </p>
+                <p data-i18n="hero.desc">Las mejores tortas, hechas con ingredientes frescos y porciones gigantes. We cater!</p>
+                <div class="contact-info">
+                    <p> 210-TORTA-10 | 210-86782-10</p>
+                    <p data-i18n="hero.horario"> Lun - Sab: 10:00 AM - 6:00 PM</p>
+                </div>
+                <a href="pages/bienvenida.html" class="cta-button" data-i18n="hero.ordenar">Ordenar</a>
+            </div>
+        </section>
+
+        <section id="menu" class="menu-section">
+            <div class="container">
+                <div class="section-title">
+                    <h2 data-i18n="sec.tortugas">Las Tortugas</h2>
+                    <p data-i18n="menu.combos_incluyen">Todos los combos incluyen soda en lata y papas (chips). $1 off Torta by self.</p>
+                </div>
+
+                <div class="menu-grid">
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-original.png" alt="La Special Double T" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>La Special Double T</h3>
+                            <span class="badge new" data-i18n="badge.nuevo">NUEVO!</span>
+                        </div>
+                        <p class="desc" data-i18n="prod.double_t.desc">1 whole BIG avocado with 15 slices of mix meats (ham, pork head cheese & turkey) with tomato, onions, mayo and queso fresco.</p>
+                        <div class="price-row">
+                            <span>COMBO (w/ 15 Slices, 2 can sodas)</span>
+                            <strong>$20</strong>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-original.png" alt="1. La Original" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>1. La Original</h3>
+                            <span class="badge best" data-i18n="badge.bestseller">BEST SELLER</span>
+                        </div>
+                        <p class="desc" data-i18n="prod.original.desc">1 whole BIG avocado, 3 mix meat slices (ham, pork head cheese & turkey) with tomato, onions, mayo and queso fresco.</p>
+                        <div class="combo-options">
+                            <div class="combo-row"><span>A. Triple Meat (9 Slices)</span> <strong>$17</strong></div>
+                            <div class="combo-row"><span>B. Double Meat (6 Slices)</span> <strong>$16</strong></div>
+                            <div class="combo-row"><span>C. Single Meat (3 Slices)</span> <strong>$14</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-turkey.png" alt="2. Turkey or Ham Tortuga" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>2. Turkey or Ham Tortuga</h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.turkey_ham.desc">1 whole BIG avocado, turkey, ham or mix meat slices with tomato, onions, mayo and queso fresco.</p>
+                        <div class="combo-options">
+                            <div class="combo-row"><span>A. Triple Meat (9 Slices)</span> <strong>$17</strong></div>
+                            <div class="combo-row"><span>B. Double Meat (6 Slices)</span> <strong>$16</strong></div>
+                            <div class="combo-row"><span>C. Single Meat (3 Slices)</span> <strong>$14</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-pork.png" alt="3. Pork Head Chz Tortuga" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>3. Pork Head Chz Tortuga</h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.pork.desc">1 whole BIG avocado, pork head cheese meat slices, with tomato, onions, mayo and queso fresco.</p>
+                        <div class="combo-options">
+                            <div class="combo-row"><span>A. Triple Meat (12 Slices)</span> <strong>$17</strong></div>
+                            <div class="combo-row"><span>B. Double Meat (8 Slices)</span> <strong>$16</strong></div>
+                            <div class="combo-row"><span>C. Single Meat (4 Slices)</span> <strong>$14</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-shrimp.png" alt="4. Shrimp Tortuga" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>4. Shrimp Tortuga</h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.shrimp.desc">1 whole BIG avocado, shrimp with 3 mix meat slices (ham, turkey & pork head cheese), tomato, red onions, mayo and queso fresco.</p>
+                        <div class="combo-options">
+                            <div class="combo-row"><span>A. Double Shrimp (w/ 10 Shrimps)</span> <strong>$20</strong></div>
+                            <div class="combo-row"><span>B. Single Shrimp (w/ 5 Shrimps)</span> <strong>$17</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-allmeat.png" alt="5. Only Meat No Veggies" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>5. Only Meat No Veggies</h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.only_meat.desc">3 mix meat slices (turkey, ham and pork head cheese) with mayo and queso fresco.</p>
+                        <div class="combo-options">
+                            <div class="combo-row"><span>A. Triple Meat (15 Slices)</span> <strong>$16</strong></div>
+                            <div class="combo-row"><span>B. Double Meat (12 Slices)</span> <strong>$15</strong></div>
+                            <div class="combo-row"><span>C. Single Meat (9 Slices)</span> <strong>$13</strong></div>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-vegan.png" alt="6. Vegan Tortuga" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>6. Vegan Tortuga</h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.vegan.desc">2 whole BIG avocados, double tomatoes, double onions and double red onions w/ mayo.</p>
+                        <div class="price-row">
+                            <span>COMBO</span>
+                            <strong>$13</strong>
+                        </div>
+                    </div>
+
+                    <div class="menu-item glass-panel">
+                        <div class="item-img"><img src="img/torta-kids.png" alt="Kids Tortuga" loading="lazy"></div>
+                        <div class="item-header">
+                            <h3>7. Kids Tortuga <small>(Nonitos Style)</small></h3>
+                        </div>
+                        <p class="desc" data-i18n="prod.kids.desc">8 ham slices, cheese and mayo.</p>
+                        <div class="price-row">
+                            <span>COMBO</span>
+                            <strong>$9</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sides" class="sides-section">
+            <div class="container">
+                <div class="sides-grid">
+                    <div class="side-category glass-panel">
+                        <h3 data-i18n="menu.extras_sides">Extras & Sides</h3>
+                        <ul class="sides-list">
+                            <li><span>Torta Bun</span> <span>$3.50</span></li>
+                            <li><span>Avocado</span> <span>$ MKP</span></li>
+                            <li><span>6 Shrimp</span> <span>$5.00</span></li>
+                            <li><span>1 Shrimp</span> <span>$1.00</span></li>
+                            <li><span>1 Extra Slice of Meat</span> <span>$1.00</span></li>
+                            <li><span>Chips</span> <span>$2.00</span></li>
+                            <li><span>Extra Salsa or Jalapeño</span> <span>$0.50</span></li>
+                        </ul>
+                    </div>
+
+                    <div class="side-category glass-panel">
+                        <h3 data-i18n="menu.bebidas_botanas">Bebidas & Botanas</h3>
+                        <ul class="sides-list">
+                            <li><span>Miche Tortuga (w/ 13 shrimp)</span> <span>$19.00</span></li>
+                            <li><span>Miche Tortuga (w/ 6 shrimp)</span> <span>$15.00</span></li>
+                            <li><span>Shrimp Botana (LG, 15 shrimp)</span> <span>$20.00</span></li>
+                            <li><span>Shrimp Botana (MD, 10 shrimp)</span> <span>$14.00</span></li>
+                            <li><span>Topochico Preparado (w/ 6 shrimp)</span> <span>$12.00</span></li>
+                            <li><span>Botana Platter (SM/LG)</span> <span>$8.00 / $12.00</span></li>
+                            <li><span>Cucumbersitos (SM/LG)</span> <span>$4.00 / $8.00</span></li>
+                            <li><span>Can Soda</span> <span>$2.00</span></li>
+                            <li><span>Bottle Drinks / Homemade Lemonade</span> <span>$4.00 - $6.00</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="imgcontainer">
+                <img src="img/menutortugas.jpg" alt="Menú Tortas Tortuga" loading="lazy">
+            </div>
+        </section>
+
+        <footer class="glass-panel" style="margin: 50px auto; max-width: 1200px; text-align: center;">
+            <p style="color: var(--primary); font-weight: bold; margin-bottom: 10px;">San Antonio Area - We Cater! Schedule your order at least 60 minutes in advance.</p>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">$30 Minimum purchase for schedule an order w/ $5 delivery fee OR $60 free delivery.</p>
+            <div style="margin-top: 20px;">
+                <a href="pages/bienvenida.html" class="cta-button" data-i18n="hero.ordenar">Ordenar</a>
+            </div>
+        </footer>
+    </main>
+
+    <script src="js/script.js"></script>
+
+<!-- PWA Install Banner -->
+<div id="pwa-banner" style="display:none;position:fixed;bottom:1rem;left:50%;transform:translateX(-50%);
+     background:#1C1C1C;border:1px solid rgba(255,90,0,.4);border-radius:14px;
+     padding:.75rem 1rem;display:none;align-items:center;gap:.75rem;
+     z-index:9999;max-width:340px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,.5);">
+  <span style="font-size:1.5rem;">🐢</span>
+  <div style="flex:1;">
+    <div style="font-size:.82rem;font-weight:700;color:#fff;">Instalar Tortas Tortuga</div>
+    <div style="font-size:.72rem;color:#888;">Acceso rápido desde tu pantalla</div>
+  </div>
+  <button id="pwa-install-btn"
+    style="background:#FF5A00;border:none;color:#fff;border-radius:8px;
+           padding:.35rem .75rem;font-family:inherit;font-size:.78rem;font-weight:700;cursor:pointer;">
+    Instalar
+  </button>
+  <button onclick="document.getElementById('pwa-banner').style.display='none'"
+    style="background:none;border:none;color:#888;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+</div>
+
+<script>
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    var banner = document.getElementById('pwa-banner');
+    if (banner) banner.style.display = 'flex';
+});
+
+document.getElementById('pwa-install-btn')?.addEventListener('click', async function() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    var result = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    document.getElementById('pwa-banner').style.display = 'none';
+});
+
+window.addEventListener('appinstalled', function() {
+    document.getElementById('pwa-banner').style.display = 'none';
+});
+</script>
+
+
+<script src="js/tt-alert.js"></script>
+<script src="js/perfil-barra.js?v=1787439078"></script>
+<script>
+// Mostrar el cajero/empleado/cliente activo en el boton de login (si hay sesion)
+(function() {
+    function actualizarLoginNav() {
+        var sesion = window.TT_getSesion ? window.TT_getSesion() : null;
+        var link = document.getElementById('nav-login-link');
+        var txt = document.getElementById('nav-login-text');
+        if (!link || !txt) return;
+
+        if (sesion) {
+            // Sesion activa (cliente, empleado o cajero): mostrar nombre y permitir cerrar sesion
+            var primerNombre = sesion.nombre.split(' ')[0];
+            txt.textContent = primerNombre;
+            link.innerHTML = '👤 <span id="nav-login-text">' + primerNombre + '</span> · Salir';
+            link.href = '#';
+            link.onclick = function(e) {
+                e.preventDefault();
+                function _hacerLogout() {
+                    ['tt_cliente_nombre','tt_cliente_telefono','tt_cliente_ts','tt_cliente_uid',
+                     'tt_cajero_id','tt_cajero_nombre','tt_cajero_rol','tt_cajero_ts',
+                     'tt_emp_id','tt_emp_pin','tt_emp_ts','tt_emp_docid','tt_emp_nombre','tt_emp_rol'
+                    ].forEach(function(k){ sessionStorage.removeItem(k); localStorage.removeItem(k); });
+                    location.reload();
+                }
+                var msg = '¿Cerrar sesión de ' + sesion.nombre + '?';
+                if (window.ttConfirm) window.ttConfirm(msg).then(function(ok){ if (ok) _hacerLogout(); });
+                else if (confirm(msg)) _hacerLogout();
+            };
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', actualizarLoginNav);
+    } else {
+        actualizarLoginNav();
+    }
+})();
+</script>
+
+<script>
+// Registrar el service worker (network-first para HTML/JS/CSS)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(function(reg) {
+        // Forzar actualizacion inmediata
+        reg.update();
+    }).catch(function(){});
+    // Recargar si el SW toma control (version nueva)
+    var recargado = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+        if (!recargado) { recargado = true; location.reload(); }
+    });
+}
+</script>
+
+<script>
+// ── MENU HAMBURGUESA ──
+window.toggleMenu = function() {
+    var links = document.getElementById('nav-links');
+    var btn = document.getElementById('hamburger-btn');
+    var overlay = document.getElementById('nav-overlay');
+    var abierto = links.classList.contains('abierto');
+    if (abierto) { cerrarMenu(); }
+    else {
+        links.classList.add('abierto');
+        btn.classList.add('activo');
+        if (overlay) overlay.classList.add('visible');
+        document.body.style.overflow = 'hidden';
+    }
+};
+window.cerrarMenu = function() {
+    var links = document.getElementById('nav-links');
+    var btn = document.getElementById('hamburger-btn');
+    var overlay = document.getElementById('nav-overlay');
+    if (links) links.classList.remove('abierto');
+    if (btn) btn.classList.remove('activo');
+    if (overlay) overlay.classList.remove('visible');
+    document.body.style.overflow = '';
+};
+// Cerrar con tecla Escape
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') cerrarMenu(); });
+</script>
+<script src="js/idioma.js?v=1787110420"></script>
+
+<script>
+/* Si hay sesión activa, la barra compartida (perfil-barra.js?v=1787439078) ya da toda la
+   navegación. Ocultamos la nav de la landing para no duplicar. */
+(function() {
+    function haySesion() {
+        var ahora = Date.now();
+        var V = 20 * 60 * 1000;
+        var empTs = parseInt(sessionStorage.getItem('tt_emp_ts') || '0');
+        var cajTs = parseInt(sessionStorage.getItem('tt_cajero_ts') || '0');
+        var cliTs = parseInt(sessionStorage.getItem('tt_cliente_ts') || '0');
+        if (sessionStorage.getItem('tt_emp_id') && (ahora - empTs < V)) return true;
+        if (sessionStorage.getItem('tt_cajero_nombre') && (ahora - cajTs < V)) return true;
+        if (sessionStorage.getItem('tt_cliente_nombre') && (ahora - cliTs < V)) return true;
+        // localStorage persistente de empleado
+        if (localStorage.getItem('tt_emp_id') || localStorage.getItem('tt_cajero_id')) return true;
+        return false;
+    }
+    function ajustarNav() {
+        if (haySesion()) {
+            var nav = document.querySelector('.glass-nav');
+            if (nav) nav.style.display = 'none';
+        }
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ajustarNav);
+    } else {
+        ajustarNav();
+    }
+    setTimeout(ajustarNav, 500);
+})();
+</script>
+</body>
+</html>

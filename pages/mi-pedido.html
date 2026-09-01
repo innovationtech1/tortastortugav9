@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Orden — Tortas Tortuga</title>
+<link rel="icon" href="../favicon.ico">
+<link rel="stylesheet" href="../css/leaflet/leaflet.css">
+<script src="../js/leaflet/leaflet.js"></script>
+<script>
+// ── ACCESO SOLO CLIENTE CON SESION ────────────────────────────
+// Si no hay sesion de cliente (ni de staff, que tiene su propio tablero
+// completo en cocina.html), no hay nada que mostrar aqui: al login.
+(function() {
+    var VEINTE_MIN = 20 * 60 * 1000;
+    // sessionStorage NO se comparte entre pestañas — y "Ver mi pedido"
+    // se abre en pestaña nueva. Por eso leemos también de localStorage
+    // (que sí se comparte) como respaldo.
+    function leer(clave) {
+        return sessionStorage.getItem(clave) || localStorage.getItem(clave);
+    }
+    var cliNombre = leer('tt_cliente_nombre');
+    var cliTs = parseInt(leer('tt_cliente_ts') || '0');
+    var empId = leer('tt_emp_id');
+    var empTs = parseInt(leer('tt_emp_ts') || '0');
+    var cajNombre = leer('tt_cajero_nombre');
+    var cajTs = parseInt(leer('tt_cajero_ts') || '0');
+
+    var hayCliente = cliNombre && (Date.now() - cliTs < VEINTE_MIN);
+    var esStaff = (empId && (Date.now() - empTs < VEINTE_MIN)) ||
+                  (cajNombre && (Date.now() - cajTs < VEINTE_MIN));
+
+    if (!hayCliente && !esStaff) {
+        window.location.replace('bienvenida.html');
+    }
+    // Si es staff y llega aqui por error, mandarlo a su tablero de verdad
+    if (esStaff) {
+        window.location.replace('cocina.html');
+    }
+})();
+</script>
+<style>
+:root {
+  --bg:#0D0D0D; --surface:#1A1A1A; --border:rgba(255,255,255,.1); --text:#fff; --muted:#888;
+  --orange:#FF5A00; --blue:#3B82F6; --green:#25D366; --yellow:#FBB724; --red:#FF4444;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',sans-serif;min-height:100vh;}
+.header{background:#111;border-bottom:2px solid var(--orange);padding:.9rem 1.1rem;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.logo{font-size:1rem;font-weight:900;color:var(--orange);}
+.hbtn{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.4rem .8rem;font-family:inherit;font-size:.78rem;cursor:pointer;text-decoration:none;}
+main{max-width:640px;margin:0 auto;padding:1.2rem 1rem 3rem;}
+.aviso{background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.3);color:#A78BFA;
+  border-radius:12px;padding:.7rem .9rem;font-size:.78rem;margin-bottom:1.1rem;text-align:center;}
+.pedido-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  padding:1.1rem;margin-bottom:1rem;}
+.pedido-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;}
+.pedido-folio{font-size:1.05rem;font-weight:900;color:var(--orange);}
+.pedido-estado{font-size:.72rem;font-weight:800;padding:.3rem .7rem;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;}
+.est-nuevo{background:rgba(59,130,246,.15);color:var(--blue);}
+.est-cocina{background:rgba(251,183,36,.15);color:var(--yellow);}
+.est-listo{background:rgba(37,211,102,.15);color:var(--green);}
+.est-camino{background:rgba(59,130,246,.15);color:#3B82F6;}
+.est-entregado{background:rgba(255,255,255,.08);color:#999;}
+.est-cancelado{background:rgba(255,68,68,.15);color:var(--red);}
+.pedido-items{font-size:.85rem;color:#ccc;white-space:pre-line;line-height:1.6;margin-bottom:.6rem;}
+.pedido-fecha{font-size:.75rem;color:#888;margin-bottom:.5rem;}
+.pedido-total{font-weight:800;font-size:.95rem;text-align:right;color:#fff;}
+.vacio{text-align:center;color:#666;font-size:.9rem;padding:3rem 1rem;}
+.progreso{display:flex;gap:.3rem;margin:.7rem 0;}
+.progreso .paso{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.08);}
+.progreso .paso.activo{background:var(--orange);}
+/* ── Stepper de seguimiento en vivo ── */
+.tt-stepper{position:relative;display:flex;margin:1rem 0 .4rem;}
+.tt-stepper .tt-track-bg,.tt-stepper .tt-track-fill{position:absolute;top:15px;height:3px;border-radius:3px;z-index:0;}
+.tt-stepper .tt-track-bg{background:rgba(255,255,255,.10);}
+.tt-stepper .tt-track-fill{background:var(--orange);transition:width .5s ease;}
+.tt-step{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;gap:.3rem;}
+.tt-step-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;background:#242424;border:2px solid rgba(255,255,255,.15);color:#888;transition:all .3s ease;}
+.tt-step.done .tt-step-dot{background:var(--orange);border-color:var(--orange);color:#fff;}
+.tt-step.current .tt-step-dot{background:var(--orange);border-color:#fff;color:#fff;
+  box-shadow:0 0 0 4px rgba(255,90,0,.28);animation:ttStepPulse 1.4s infinite;}
+.tt-step-lbl{font-size:.58rem;font-weight:800;text-align:center;color:#777;line-height:1.15;max-width:64px;
+  text-transform:uppercase;letter-spacing:.02em;}
+.tt-step.done .tt-step-lbl{color:#bbb;}
+.tt-step.current .tt-step-lbl{color:var(--orange);}
+@keyframes ttStepPulse{0%,100%{box-shadow:0 0 0 4px rgba(255,90,0,.28);}50%{box-shadow:0 0 0 8px rgba(255,90,0,.10);}}
+.tt-cancelado{display:flex;align-items:center;gap:.5rem;justify-content:center;margin:.9rem 0 .3rem;
+  background:rgba(244,67,54,.12);border:1px solid rgba(244,67,54,.4);color:#EF9A9A;
+  border-radius:10px;padding:.6rem;font-size:.85rem;font-weight:800;}
+</style>
+<style>
+.tt-emoji-icon { font-size: 26px; text-align: center; line-height: 1; background: none; border: none; filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
+.tt-track-map .leaflet-container { background: #1a1a1a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">🛍️ Mi Orden</div>
+    <a href="../ordenar.html" class="hbtn">🛒 Ordenar más</a>
+</div>
+
+<main>
+    <div class="aviso">👁️ Solo puedes ver tus propios pedidos aquí. Esta es una vista de solo lectura.</div>
+    <div id="lista-pedidos">
+        <div class="vacio">Cargando tus pedidos…</div>
+    </div>
+</main>
+
+<script src="../js/estados.js?v=1788145000"></script>
+<script type="module">
+import { db } from '../js/firebase-config.js';
+import { collection, onSnapshot, doc, deleteDoc, addDoc, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+function _leer(clave) {
+    return sessionStorage.getItem(clave) || localStorage.getItem(clave);
+}
+const uid = _leer('tt_cliente_uid') || null;
+const telefono = (_leer('tt_cliente_telefono') || '').replace(/\D/g,'');
+const miNombre = (_leer('tt_cliente_nombre') || '').trim().toLowerCase();
+
+// Clase CSS local (est-*) derivada de la clave canónica.
+const _CLASE_ESTADO = {
+    PROGRAMADO: 'est-nuevo', NUEVO: 'est-nuevo', EN_COCINA: 'est-cocina',
+    LISTO: 'est-listo', EN_CAMINO: 'est-camino', ENTREGADO: 'est-entregado',
+    CANCELADO: 'est-cancelado'
+};
+function claseEstado(estado) {
+    return _CLASE_ESTADO[TTEstados.normalizar(estado)] || 'est-nuevo';
+}
+
+// ── Stepper de seguimiento en vivo ───────────────────────────────────
+// Muestra al cliente EN QUÉ ETAPA va su pedido, con íconos y etiquetas,
+// resaltando la etapa actual. Se re-renderiza solo con cada onSnapshot.
+// Domicilio incluye "En camino"; pickup lo omite.
+function renderProgreso(estado, esDomicilio) {
+    // Si el pedido se canceló, no tiene sentido el avance: aviso claro.
+    if (TTEstados.estaCancelado(estado)) {
+        return '<div class="tt-cancelado">❌ Pedido cancelado</div>';
+    }
+    // Cada paso: [claveEstado, icono, etiqueta]
+    var pasos = [
+        ['NUEVO',     '📝', 'Recibido'],
+        ['EN_COCINA', '🧑‍🍳', 'Preparando'],
+        ['LISTO',     '✅', 'Listo']
+    ];
+    if (esDomicilio) pasos.push(['EN_CAMINO', '🛵', 'En camino']);
+    pasos.push(['ENTREGADO', '🎉', 'Entregado']);
+
+    var ordRango = TTEstados.rango(estado);
+    // Índice de la etapa ACTUAL = la última cuyo rango ya se alcanzó.
+    var actual = -1;
+    pasos.forEach(function(p, i) {
+        if (TTEstados.ESTADOS[p[0]].rango <= ordRango) actual = i;
+    });
+
+    var N = pasos.length;
+    var trackLeft = 50 / N;              // centro del primer punto (%)
+    var trackWidth = 100 - 100 / N;     // del primer al último punto (%)
+    var fillFrac = (N > 1 && actual > 0) ? (actual / (N - 1)) : 0;
+    var fillWidth = trackWidth * fillFrac;
+
+    var html = '<div class="tt-stepper">' +
+        '<div class="tt-track-bg" style="left:' + trackLeft + '%;width:' + trackWidth + '%;"></div>' +
+        '<div class="tt-track-fill" style="left:' + trackLeft + '%;width:' + fillWidth + '%;"></div>';
+    pasos.forEach(function(p, i) {
+        var cls = i < actual ? 'done' : (i === actual ? 'current' : '');
+        var ico = i < actual ? '✓' : p[1];   // pasos completados muestran ✓
+        html += '<div class="tt-step ' + cls + '">' +
+                    '<div class="tt-step-dot">' + ico + '</div>' +
+                    '<div class="tt-step-lbl">' + p[2] + '</div>' +
+                '</div>';
+    });
+    html += '</div>';
+    return html;
+}
+
+function esMio(p) {
+    // Si el pedido ya fue archivado por el admin (procesado/entregado),
+    // deja de mostrarse al cliente en "Mi Pedido".
+    if (p.archivado === true) return false;
+    // Cuenta con email (uid verificable) — coincidencia confiable.
+    if (uid && p.clienteUid && p.clienteUid === uid) return true;
+    // Login rapido por telefono — coincidencia por numero (solo de interfaz,
+    // no blindada a nivel de servidor; ver nota de seguridad en firestore.rules).
+    if (telefono && (p.telefono || '').replace(/\D/g,'') === telefono) return true;
+    // Invitado sin telefono — coincidencia por nombre (respaldo para que
+    // vea el pedido que acaba de hacer). Igual solo de interfaz.
+    if (miNombre && (p.cliente || p.nombre || '').trim().toLowerCase() === miNombre) return true;
+    return false;
+}
+
+// Desglose del cobro para que el cliente vea qué se le cobra
+function _desgloseCobro(p) {
+    var d = p.desglose || {};
+    var envio = Number(p.cargoServicio) || Number(d.envio) || 0;
+    var subtotal = Number(d.subtotal) || 0;
+    var impuesto = Number(d.impuesto) || 0;
+    var descuento = Number(d.descuento) || 0;
+    var propina = Number(d.propina) || 0;
+    var total = Number(p.totalNum) || Number(d.total) || parseFloat(String(p.total||'').replace(/[^0-9.]/g,'')) || 0;
+
+    // Si no hay subtotal guardado, calcularlo de los productos
+    if (!subtotal && Array.isArray(p.itemsData) && p.itemsData.length) {
+        subtotal = p.itemsData.reduce(function(s, it){
+            return s + (Number(it.precio)||0) * (Number(it.cantidad)||1);
+        }, 0);
+    }
+    // Si aún no hay subtotal pero sí total y envío, deducirlo
+    if (!subtotal && total && envio) {
+        subtotal = Math.max(0, total - envio - impuesto);
+    }
+
+    // Si de plano no hay nada que desglosar, mostrar solo el total
+    if (!subtotal && !envio && !impuesto) {
+        return '<div class="pedido-total">' + (p.total || '') + '</div>';
+    }
+
+    var filas = '';
+    function fila(label, valor, color) {
+        return '<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;color:' + (color||'#bbb') + ';">' +
+               '<span>' + label + '</span><span>$' + valor.toFixed(2) + '</span></div>';
+    }
+    if (subtotal) filas += fila('Productos', subtotal);
+    if (descuento) filas += fila('Descuento', -descuento, '#FBB724');
+    if (envio) filas += fila('🛵 Envío a domicilio', envio, '#5B9BFF');
+    if (impuesto) {
+        var tasa = d.impuestoTasa ? ' (' + (d.impuestoTasa*100).toFixed(0) + '%)' : '';
+        filas += fila('Impuesto' + tasa, impuesto);
+    }
+    if (propina) filas += fila('Propina', propina);
+
+    return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.7rem .8rem;margin-top:.4rem;">' +
+        filas +
+        '<div style="display:flex;justify-content:space-between;font-weight:900;font-size:1rem;color:#25D366;border-top:1px solid rgba(255,255,255,.1);margin-top:.4rem;padding-top:.4rem;">' +
+        '<span>Total</span><span>$' + total.toFixed(2) + '</span></div>' +
+    '</div>';
+}
+
+let _firmaRenderPedidos = '';
+function renderPedidos(pedidos) {
+    const cont = document.getElementById('lista-pedidos');
+    if (!pedidos.length) {
+        cont.innerHTML = '<div class="vacio">Todavía no tienes pedidos. ¡Haz el primero! 🌯</div>';
+        _firmaRenderPedidos = '';
+        return;
+    }
+    pedidos.sort((a, b) => (b.creado?.seconds || 0) - (a.creado?.seconds || 0));
+
+    // Firma de render: solo reconstruir si cambió algo relevante (evita destruir el mapa en cada snapshot)
+    var firma = pedidos.map(function(p){
+        return p.id + '|' + (p.estado||'') + '|' + (p.repartidorId||'') + '|' + (p.repartidorNombre||'') + '|' + (p.total||'') + '|' + (p.estadoPago||'');
+    }).join('~');
+    if (firma === _firmaRenderPedidos) {
+        // Nada relevante cambió: solo refrescar los mapas (por si cambió el repartidor no, pero mantiene el rastreo vivo)
+        setTimeout(activarMapasEnVivo, 100);
+        return;
+    }
+    _firmaRenderPedidos = firma;
+
+    // Se va a reconstruir el HTML: limpiar los mapas viejos para que se recreen sobre los nuevos divs
+    try {
+        Object.keys(_ttMapas).forEach(function(pid){
+            var est = _ttMapas[pid];
+            if (est && est.unsub) { try { est.unsub(); } catch(e){} }
+            if (est && est.map) { try { est.map.remove(); } catch(e){} }
+            delete _ttMapas[pid];
+        });
+    } catch(e){}
+
+    cont.innerHTML = pedidos.map(p => {
+        // Para domicilio el flujo incluye "En camino"; pickup lo omite.
+        const esDomicilio = p.tipo === 'delivery' || p.tipoServicio === 'Domicilio' || p.tipoEntrega === 'Domicilio';
+        const pasos = renderProgreso(p.estado, esDomicilio);
+        // Fecha y hora del pedido (desde el timestamp de creación)
+        let fechaHora = '';
+        const cd = p.creado?.toDate ? p.creado.toDate() : (p.creado?.seconds ? new Date(p.creado.seconds * 1000) : (p.tomadaEn ? new Date(p.tomadaEn) : null));
+        if (cd) {
+            fechaHora = cd.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) +
+                        ' · ' + cd.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        }
+        const yaCompartio = !!p.ubicacionCliente;
+        const btnUbic = `<button onclick="compartirUbicacionAqui('${p.id}', this)"
+            id="btn-ubi-${p.id}"
+            style="display:block;width:100%;margin-top:.7rem;padding:.6rem;text-align:center;
+            border-radius:10px;font-size:.82rem;font-weight:700;font-family:inherit;cursor:pointer;
+            background:${yaCompartio ? 'rgba(37,211,102,.12)' : 'rgba(37,211,102,.15)'};
+            border:1px solid rgba(37,211,102,.35);color:#25D366;">
+            ${yaCompartio ? '✅ Ubicación enviada — tocar para actualizar' : '📍 Compartir mi ubicación'}</button>`;
+
+        // Botón para cancelar el pedido — DESHABILITADO temporalmente
+        // (El código se conserva para poder reactivarlo en el futuro)
+        const btnCancelar = '';
+
+        // ── Mapa en vivo de la tortumóvil (solo domicilio con repartidor) ──
+        // Reusa la variable esDomicilio ya declarada arriba (L153).
+        var _esDomMapa = esDomicilio || String(p.tipoEntrega || '').toLowerCase().indexOf('domicilio') >= 0;
+        var repIdMapa = p.repartidorId || p.tortumovilId || '';
+        var entregadoMapa = TTEstados.estaEntregado(p.estado);
+        var bloqueMapa = '';
+        if (_esDomMapa && repIdMapa && !entregadoMapa) {
+            bloqueMapa =
+                '<div class="tt-track" data-pedido="' + p.id + '" data-rep="' + repIdMapa + '"' +
+                (p.ubicacionCliente ? ' data-clat="' + p.ubicacionCliente.lat + '" data-clng="' + p.ubicacionCliente.lng + '"' : '') +
+                ' style="margin-top:.7rem;">' +
+                '<div class="tt-track-info" style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,90,0,.1);border:1px solid rgba(255,90,0,.3);border-radius:10px 10px 0 0;padding:.6rem .8rem;font-size:.82rem;font-weight:700;color:#FF7A33;">' +
+                '<span>🛵 Tu tortumóvil en camino</span>' +
+                '<span class="tt-track-eta">Buscando…</span>' +
+                '</div>' +
+                '<div class="tt-track-map" style="height:220px;border-radius:0 0 10px 10px;overflow:hidden;background:#1a1a1a;"></div>' +
+                '</div>';
+        }
+
+        const codigoRef = (p.codigoOrden || (p.id ? p.id.slice(-4).toUpperCase() : '----'));
+        return `
+        <div class="pedido-card">
+            <div class="pedido-top">
+                <span class="pedido-folio">${p.folioStr || '#---'}</span>
+                <span class="pedido-estado ${claseEstado(p.estado)}">${TTEstados.corto(p.estado)}</span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:.5rem;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:10px;padding:.6rem;margin:.4rem 0 .6rem;">
+                <span style="font-size:.72rem;color:#888;text-transform:uppercase;letter-spacing:.05em;">N° de orden:</span>
+                <span style="font-size:1.1rem;font-weight:900;color:#25D366;letter-spacing:.05em;">#${codigoRef}</span>
+            </div>
+            ${fechaHora ? `<div class="pedido-fecha">🗓️ ${fechaHora}</div>` : ''}
+            ${pasos}
+            <div class="pedido-items">${(p.items || '').replace(/</g,'&lt;')}</div>
+            ${_desgloseCobro(p)}
+            ${p.repartidorNombre ? `<div class="pedido-repartidor" style="display:flex;align-items:center;gap:.5rem;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.3);border-radius:10px;padding:.6rem .8rem;margin:.5rem 0;font-size:.88rem;"><span style="font-size:1.2rem;">🛵</span><span>Tu repartidor: <b style="color:#25D366;">${p.repartidorNombre}</b></span></div>` : ''}
+            ${btnUbic}
+            ${bloqueMapa}
+            ${btnCancelar}
+        </div>`;
+    }).join('');
+    setTimeout(activarMapasEnVivo, 100);
+}
+
+// ── Mapas en vivo de la tortumóvil (tiempo real + distancia + ETA) ──
+// Alias de Firestore para el mapa en vivo (doc/onSnapshot ya importados arriba)
+var _ttDoc = doc;
+var _ttOnSnapshot = onSnapshot;
+var _ttMapas = {};
+function _ttDistanciaMillas(lat1, lng1, lat2, lng2) {
+    var R = 3958.8;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+// Actualiza el mapa de un pedido con la posición del repartidor (reutilizable)
+function _ttActualizarMapa(pedidoId, snap, clat, clng, etaEl) {
+    var estado = _ttMapas[pedidoId];
+    if (!estado) return;
+    var map = estado.map;
+    if (!snap.exists()) { if(etaEl) etaEl.textContent = 'Sin señal'; return; }
+    var d = snap.data();
+    if (typeof d.lat !== 'number' || typeof d.lng !== 'number') return;
+
+    var iconoRep = L.divIcon({ html: '🛵', className: 'tt-emoji-icon', iconSize: [34,34], iconAnchor: [17,17] });
+    if (!estado.repMarker) {
+        estado.repMarker = L.marker([d.lat, d.lng], { icon: iconoRep }).addTo(map).bindPopup(d.nombre || 'Tortumóvil');
+    } else {
+        estado.repMarker.setLatLng([d.lat, d.lng]);
+        estado.repMarker.bindPopup(d.nombre || 'Tortumóvil');
+    }
+
+    if (estado.cliMarker && !isNaN(clat)) {
+        var grupo = L.featureGroup([estado.repMarker, estado.cliMarker]);
+        map.fitBounds(grupo.getBounds().pad(0.3));
+        if (estado.line) map.removeLayer(estado.line);
+        estado.line = L.polyline([[d.lat, d.lng], [clat, clng]], { color: '#FF7A33', weight: 3, dashArray: '6,8' }).addTo(map);
+        var millas = _ttDistanciaMillas(d.lat, d.lng, clat, clng);
+        var minutos = Math.max(1, Math.round((millas / 18.6) * 60));
+        if (etaEl) etaEl.textContent = millas.toFixed(1) + ' mi · ~' + minutos + ' min';
+    } else {
+        map.setView([d.lat, d.lng], 15);
+        if (etaEl) etaEl.textContent = 'En camino';
+    }
+}
+
+function activarMapasEnVivo() {
+    if (!window.L) return;
+    var bloques = document.querySelectorAll('.tt-track');
+    bloques.forEach(function(bloque) {
+        var pedidoId = bloque.getAttribute('data-pedido');
+        var repId    = bloque.getAttribute('data-rep');
+        var clat = parseFloat(bloque.getAttribute('data-clat'));
+        var clng = parseFloat(bloque.getAttribute('data-clng'));
+        // Si el mapa ya existe...
+        if (_ttMapas[pedidoId]) {
+            var est = _ttMapas[pedidoId];
+            // Si el repartidor NO cambió, no hacer nada (evita recrear el mapa)
+            if (est._repId === repId) return;
+            // El repartidor CAMBIÓ: cancelar la suscripción vieja y re-suscribir al nuevo
+            if (est.unsub) { try { est.unsub(); } catch(e){} }
+            if (est.repMarker) { try { est.map.removeLayer(est.repMarker); } catch(e){} est.repMarker = null; }
+            est._repId = repId;
+            var etaEl2 = bloque.querySelector('.tt-track-eta');
+            if (etaEl2) etaEl2.textContent = 'Buscando…';
+            var docRef2 = _ttDoc(db, 'ubicaciones', repId);
+            est.unsub = _ttOnSnapshot(docRef2, function(snap){ _ttActualizarMapa(pedidoId, snap, clat, clng, etaEl2); });
+            return;
+        }
+
+        var cont  = bloque.querySelector('.tt-track-map');
+        var etaEl = bloque.querySelector('.tt-track-eta');
+        if (!cont) return;
+
+        var map = L.map(cont, { zoomControl: true, attributionControl: false });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        map.setView([29.4241, -98.4936], 12);
+
+        var estado = { map: map, repMarker: null, cliMarker: null, line: null, unsub: null, _repId: repId };
+        _ttMapas[pedidoId] = estado;
+
+        if (!isNaN(clat) && !isNaN(clng)) {
+            var iconoCli = L.divIcon({ html: '📍', className: 'tt-emoji-icon', iconSize: [30,30], iconAnchor: [15,30] });
+            estado.cliMarker = L.marker([clat, clng], { icon: iconoCli }).addTo(map).bindPopup('Tu ubicación');
+        }
+
+        var docRef = _ttDoc(db, 'ubicaciones', repId);
+        estado.unsub = _ttOnSnapshot(docRef, function(snap) { _ttActualizarMapa(pedidoId, snap, clat, clng, etaEl); }, function(err) {
+            if (etaEl) etaEl.textContent = 'Sin señal';
+        });
+
+        setTimeout(function(){ map.invalidateSize(); }, 200);
+    });
+}
+
+onSnapshot(collection(db, 'pedidos'), snap => {
+    const todos = [];
+    snap.forEach(d => todos.push({ id: d.id, ...d.data() }));
+    const mios = todos.filter(esMio);
+    window._ultimosPedidos = mios;  // para la cancelación
+    renderPedidos(mios);
+}, err => {
+    document.getElementById('lista-pedidos').innerHTML =
+        '<div class="vacio">No se pudieron cargar tus pedidos. Intenta de nuevo más tarde.</div>';
+    console.error(err);
+});
+
+// ── CANCELACIÓN DE PEDIDO (motivo obligatorio + registro + borrado) ──
+let _cancelarPedidoId = null;
+let _cancelarPedidoFolio = null;
+let _cancelarPedidoData = null;
+
+// ── Compartir/actualizar ubicación del cliente en tiempo real (sin abrir otra pantalla) ──
+window.compartirUbicacionAqui = function(pedidoId, btn) {
+    if (!navigator.geolocation) { alert('Tu dispositivo no permite ubicación.'); return; }
+    var textoOriginal = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '📍 Obteniendo tu ubicación…'; }
+    navigator.geolocation.getCurrentPosition(async function(pos) {
+        try {
+            await updateDoc(doc(db, 'pedidos', pedidoId), {
+                ubicacionCliente: {
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    precision: pos.coords.accuracy || null,
+                    compartidaEn: Date.now()
+                }
+            });
+            if (btn) { btn.innerHTML = '✅ Ubicación actualizada'; btn.disabled = false; }
+        } catch(e) {
+            console.error('Error al guardar ubicación:', e);
+            if (btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+            alert('No se pudo guardar tu ubicación. Intenta de nuevo.');
+        }
+    }, function(err) {
+        if (btn) { btn.innerHTML = textoOriginal; btn.disabled = false; }
+        alert('No se pudo obtener tu ubicación. Da permiso de GPS e intenta de nuevo.');
+    }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+};
+
+window.abrirCancelar = function(pedidoId, folio) {
+    _cancelarPedidoId = pedidoId;
+    _cancelarPedidoFolio = folio || '';
+    // Guardar los datos del pedido para el registro (buscar en la última lista)
+    _cancelarPedidoData = (window._ultimosPedidos || []).find(function(p){ return p.id === pedidoId; }) || null;
+    document.getElementById('cancelar-info').textContent = 'Pedido ' + (folio || '') + ' — esta acción no se puede deshacer.';
+    document.getElementById('cancelar-motivo').value = '';
+    document.getElementById('cancelar-nota').value = '';
+    document.getElementById('cancelar-overlay').style.display = 'flex';
+};
+
+window.cerrarCancelar = function() {
+    document.getElementById('cancelar-overlay').style.display = 'none';
+    _cancelarPedidoId = null;
+};
+
+window.confirmarCancelar = async function() {
+    if (!_cancelarPedidoId) return;
+    const motivo = document.getElementById('cancelar-motivo').value;
+    const nota = document.getElementById('cancelar-nota').value.trim();
+    if (!motivo) {
+        alert('⚠️ Selecciona un motivo de cancelación (es obligatorio).');
+        return;
+    }
+    const p = _cancelarPedidoData || {};
+    try {
+        // 1. Guardar un registro de cancelación (para auditoría/control)
+        await addDoc(collection(db, 'cancelaciones'), {
+            pedidoId: _cancelarPedidoId,
+            folio: _cancelarPedidoFolio || (p.folioStr || ''),
+            cliente: p.cliente || p.nombre || '',
+            telefono: p.telefono || '',
+            total: p.total || '',
+            totalNum: p.totalNum || 0,
+            items: p.items || '',
+            estadoAlCancelar: p.estado || '',
+            motivo: motivo,
+            nota: nota || '',
+            canceladoPor: 'cliente',
+            canceladoEn: new Date().toISOString(),
+            creadoServidor: serverTimestamp()
+        });
+
+        // 2. Borrar el pedido del sistema (desaparece de cocina, admin y del
+        //    perfil del cliente). El registro queda en "cancelaciones".
+        //    Nota: la regla de Firestore solo permite borrar si archivado==true,
+        //    así que primero lo marcamos archivado+cancelado y luego lo borramos.
+        try {
+            await updateDoc(doc(db, 'pedidos', _cancelarPedidoId), {
+                estado: TTEstados.ESTADOS.CANCELADO.etiqueta, archivado: true,
+                canceladoMotivo: motivo, canceladoEn: new Date().toISOString()
+            });
+        } catch(e) { /* si no se puede actualizar, intentamos borrar directo */ }
+        await deleteDoc(doc(db, 'pedidos', _cancelarPedidoId));
+
+        window.cerrarCancelar();
+        if (window.ttAlert) window.ttAlert('✅ Pedido cancelado. Motivo: ' + motivo);
+        else alert('✅ Pedido cancelado.');
+    } catch(e) {
+        console.error('Error al cancelar:', e);
+        alert('❌ No se pudo cancelar el pedido. Revisa tu conexión.');
+    }
+};
+</script>
+
+<script src="../js/tt-alert.js"></script>
+<script src="../js/perfil-barra.js?v=1787439078"></script>
+<!-- Modal de cancelación de pedido -->
+<div id="cancelar-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#1A1A1A;border:1px solid rgba(239,68,68,.3);border-radius:16px;padding:1.4rem;width:100%;max-width:400px;">
+    <h3 style="margin:0 0 .3rem;font-size:1.1rem;color:#EF4444;">❌ Cancelar pedido</h3>
+    <div id="cancelar-info" style="font-size:.85rem;color:#888;margin-bottom:1rem;">—</div>
+    <p style="font-size:.8rem;color:#ccc;font-weight:700;margin:0 0 .5rem;">Motivo de cancelación (obligatorio):</p>
+    <select id="cancelar-motivo" style="width:100%;padding:.7rem;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:#111;color:#fff;font-family:inherit;font-size:.9rem;margin-bottom:.6rem;">
+      <option value="">— Selecciona un motivo —</option>
+      <option>Ya no lo quiero</option>
+      <option>Me equivoqué en el pedido</option>
+      <option>Tardó demasiado</option>
+      <option>Pedí por error</option>
+      <option>Cambié de opinión</option>
+      <option>Problema con el pago</option>
+      <option>Otro</option>
+    </select>
+    <input id="cancelar-nota" type="text" placeholder="Detalle (opcional)" style="width:100%;padding:.7rem;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:#111;color:#fff;font-family:inherit;font-size:.85rem;margin-bottom:1rem;box-sizing:border-box;">
+    <div style="display:flex;gap:.5rem;">
+      <button onclick="cerrarCancelar()" style="flex:1;padding:.8rem;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:10px;font-family:inherit;font-weight:700;cursor:pointer;">Volver</button>
+      <button onclick="confirmarCancelar()" style="flex:1;padding:.8rem;background:linear-gradient(135deg,#EF4444,#DC2626);border:none;color:#fff;border-radius:10px;font-family:inherit;font-weight:800;cursor:pointer;">Cancelar pedido</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

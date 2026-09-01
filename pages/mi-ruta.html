@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Mi Ruta — Tortas Tortuga</title>
+<link rel="stylesheet" href="../css/style.css?v=1">
+<link rel="stylesheet" href="../css/leaflet/leaflet.css" />
+<script src="../js/leaflet/leaflet.js"></script>
+<style>
+  :root { --primary:#FF5A00; --bg:#0E0E0E; --surface:#1C1C1C; --muted:#888; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:#fff; font-family:'Poppins',system-ui,sans-serif; margin:0; }
+  .ruta-header {
+    background:linear-gradient(135deg,#FF5A00,#FF8C00); padding:1.1rem 1rem;
+    display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:10;
+  }
+  .ruta-header h1 { font-size:1.15rem; font-weight:900; margin:0; display:flex; align-items:center; gap:.5rem; }
+  .ruta-header .rep-nombre { font-size:.78rem; opacity:.92; font-weight:600; }
+  .ruta-cont { max-width:640px; margin:0 auto; padding:1rem; }
+  .resumen-ruta {
+    display:flex; gap:.6rem; margin-bottom:1rem;
+  }
+  .resumen-item {
+    flex:1; background:var(--surface); border:1px solid rgba(255,255,255,.08);
+    border-radius:12px; padding:.7rem; text-align:center;
+  }
+  .resumen-item .n { font-size:1.4rem; font-weight:900; color:var(--primary); }
+  .resumen-item .l { font-size:.68rem; color:var(--muted); }
+  .pedido-card {
+    background:linear-gradient(160deg,#1c1c1c,#161616);
+    border:1px solid rgba(255,255,255,.09);
+    border-left:4px solid #FF5A00;
+    border-radius:16px; padding:1.1rem; margin-bottom:1rem;
+    box-shadow:0 4px 16px rgba(0,0,0,.3);
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+  .pedido-card:hover {
+    transform:translateY(-2px);
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+  }
+  .pedido-card.entregado {
+    border-left-color:#25D366;
+    opacity:.75;
+  }
+  .pc-top { margin-bottom:.6rem; }
+  .pc-linea {
+    display:flex; align-items:center; gap:.4rem;
+    font-size:.86rem; color:#bbb; margin:.35rem 0;
+  }
+  .pedido-card.entregado { opacity:.55; border-color:rgba(37,211,102,.3); }
+  .pc-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:.5rem; }
+  .pc-cliente { font-size:1rem; font-weight:800; }
+  .pc-folio { font-size:.72rem; color:var(--muted); }
+  .pc-total { font-size:1.1rem; font-weight:900; color:#25D366; }
+  .pc-linea { font-size:.82rem; color:#ccc; margin:.2rem 0; display:flex; gap:.4rem; }
+  .pc-pago {
+    display:inline-block; font-size:.78rem; font-weight:800; padding:.35rem .7rem;
+    border-radius:8px; margin-top:.5rem;
+  }
+  .pago-efectivo { background:rgba(255,193,7,.15); color:#FFC107; border:1px solid rgba(255,193,7,.35); }
+  .pago-digital { background:rgba(37,211,102,.15); color:#25D366; border:1px solid rgba(37,211,102,.35); }
+  .pago-pend { background:rgba(255,255,255,.08); color:#aaa; border:1px solid rgba(255,255,255,.15); }
+  .btn-maps {
+    display:block; text-align:center; background:rgba(66,133,244,.15);
+    border:1px solid rgba(66,133,244,.4); color:#5B9BFF; border-radius:10px;
+    padding:.6rem; font-weight:700; font-size:.85rem; text-decoration:none; margin-top:.6rem;
+  }
+  .vacio { text-align:center; padding:3rem 1rem; color:var(--muted); }
+  .vacio .emo { font-size:3rem; margin-bottom:.5rem; }
+  .cargando { text-align:center; padding:2rem; color:var(--muted); }
+
+  /* ── Vista de ENTREGA (mapa + orden + cobro) ── */
+  #vista-entrega {
+    position:fixed; inset:0; background:var(--bg); z-index:200; display:none;
+    flex-direction:column;
+  }
+  #vista-entrega.abierta { display:flex; }
+  .ve-header {
+    background:linear-gradient(135deg,#FF5A00,#FF8C00); padding:.9rem 1rem;
+    display:flex; align-items:center; gap:.7rem; flex-shrink:0;
+  }
+  .ve-header button.volver {
+    background:rgba(255,255,255,.2); border:none; color:#fff; border-radius:10px;
+    width:38px; height:38px; font-size:1.2rem; cursor:pointer; flex-shrink:0;
+  }
+  .ve-header .ve-tit { font-weight:900; font-size:1.05rem; }
+  .ve-header .ve-sub { font-size:.72rem; opacity:.9; }
+  #mapa-entrega { width:100%; height:38vh; flex-shrink:0; background:#222; }
+  .ve-body { flex:1; overflow-y:auto; padding:1rem; }
+  .ve-orden {
+    background:var(--surface); border:1px solid rgba(255,255,255,.09);
+    border-radius:14px; padding:1rem; margin-bottom:.9rem;
+  }
+  .ve-dato { display:flex; gap:.5rem; font-size:.85rem; margin:.3rem 0; color:#ddd; }
+  .ve-dato b { color:#fff; }
+  .ve-total-row {
+    display:flex; justify-content:space-between; align-items:center;
+    margin-top:.7rem; padding-top:.7rem; border-top:1px solid rgba(255,255,255,.1);
+  }
+  .ve-total-row .lbl { font-size:.9rem; font-weight:700; }
+  .ve-total-row .val { font-size:1.4rem; font-weight:900; color:#25D366; }
+  .btn-navegar {
+    display:block; text-align:center; background:rgba(66,133,244,.15);
+    border:1px solid rgba(66,133,244,.4); color:#5B9BFF; border-radius:10px;
+    padding:.7rem; font-weight:700; font-size:.85rem; text-decoration:none; margin-bottom:.9rem;
+  }
+  .cobro-titulo { font-size:.8rem; color:var(--muted); font-weight:700; margin:.3rem 0 .6rem; text-transform:uppercase; letter-spacing:.04em; }
+  .cobro-grid { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+  .cobro-btn {
+    padding:.85rem .5rem; border-radius:12px; border:1.5px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.04); color:#fff; font-family:inherit; font-size:.85rem;
+    font-weight:700; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:.25rem;
+  }
+  .cobro-btn:active { transform:scale(.97); }
+  .cobro-btn.efectivo { border-color:rgba(255,193,7,.4); }
+  .cobro-btn.zelle    { border-color:rgba(109,30,212,.5); }
+  .cobro-btn.cashapp  { border-color:rgba(0,214,79,.4); }
+  .cobro-btn.venmo    { border-color:rgba(0,140,255,.4); }
+  .cobro-btn.tarjeta  { border-color:rgba(91,155,255,.4); }
+  .ve-pagado {
+    background:rgba(37,211,102,.12); border:1px solid rgba(37,211,102,.4);
+    color:#25D366; border-radius:12px; padding:1rem; text-align:center; font-weight:800;
+  }
+  .btn-entregada {
+    width:100%; margin-top:.9rem; padding:.9rem; border-radius:12px; border:none;
+    background:linear-gradient(135deg,#25D366,#1DA851); color:#fff;
+    font-family:inherit; font-size:1rem; font-weight:800; cursor:pointer;
+  }
+</style>
+
+<style id="ios-compat">
+/* ── Compatibilidad iOS / Safari ── */
+/* Evitar zoom automático al enfocar inputs (iOS hace zoom si font-size < 16px) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Respetar el notch y áreas seguras del iPhone */
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+/* Momentum scroll suave en iOS */
+* { -webkit-overflow-scrolling: touch; }
+/* Evitar resaltado azul al tocar botones en iOS */
+button, a, .btn-primary, .hbtn, .mp-btn { -webkit-tap-highlight-color: transparent; }
+/* Evitar que iOS ajuste el tamaño del texto al rotar */
+html { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+
+<div class="ruta-header">
+  
+  <h1 style="flex:1;">🛵 Mi Ruta</h1>
+  <div style="text-align:right;">
+    <div class="rep-nombre" id="rep-nombre">—</div>
+    <a href="bienvenida.html" style="color:#fff;font-size:.7rem;text-decoration:underline;opacity:.9;">Salir</a>
+  </div>
+</div>
+
+<div class="ruta-cont">
+  <div class="resumen-ruta" id="resumen" style="display:none;">
+    <div class="resumen-item"><div class="n" id="r-pend">0</div><div class="l">Por entregar</div></div>
+    <div class="resumen-item"><div class="n" id="r-hechas">0</div><div class="l">Entregadas</div></div>
+    <div class="resumen-item"><div class="n" id="r-efectivo">$0</div><div class="l">Efectivo a cobrar</div></div>
+  </div>
+
+  <!-- Filtro por repartidor (solo gerente/supervisor) -->
+  <div id="filtro-rep-wrap" style="display:none;margin-bottom:.9rem;">
+    <label style="display:block;font-size:.75rem;color:#888;text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:.4rem;">🛵 Ver órdenes de:</label>
+    <select id="filtro-rep" onchange="aplicarFiltroRep()" style="width:100%;padding:.7rem;border-radius:12px;border:1px solid rgba(255,90,0,.3);background:#1a1a1a;color:#fff;font-family:inherit;font-size:16px;font-weight:700;">
+      <option value="__mias__">Mis órdenes</option>
+      <option value="__todas__">Todas las órdenes</option>
+    </select>
+  </div>
+
+  <!-- Interruptor de compartir ubicación en tiempo real -->
+  <div id="ubi-toggle-cont" style="background:#1a1a1a;border:1px solid rgba(37,211,102,.3);border-radius:12px;padding:.8rem 1rem;margin-bottom:1rem;">
+    <div style="color:#888;font-size:.85rem;">Cargando estado de ubicación…</div>
+  </div>
+
+  <div id="lista-ruta">
+    <div class="cargando">Cargando tu ruta…</div>
+  </div>
+</div>
+
+<!-- VISTA DE ENTREGA: mapa + orden + cobro -->
+<div id="vista-entrega">
+  <div class="ve-header">
+    <button class="volver" onclick="cerrarEntrega()">←</button>
+    <div>
+      <div class="ve-tit" id="ve-cliente">Cliente</div>
+      <div class="ve-sub" id="ve-folio">Orden</div>
+    </div>
+  </div>
+  <div id="mapa-entrega"></div>
+  <div class="ve-body">
+    <div class="ve-orden">
+      <div class="ve-dato" id="ve-dir-row">📍 <span id="ve-dir">—</span></div>
+      <div class="ve-dato" id="ve-tel-row">📞 <span id="ve-tel">—</span></div>
+      <div class="ve-dato" id="ve-hora-row">🕐 <span id="ve-hora">—</span></div>
+      <div class="ve-dato" style="flex-direction:column;gap:.15rem;margin-top:.4rem;" id="ve-items"></div>
+      <div class="ve-total-row">
+        <span class="lbl">Total a cobrar</span>
+        <span class="val" id="ve-total">$0.00</span>
+      </div>
+    </div>
+
+    <button class="btn-en-camino" id="ve-btn-camino" onclick="marcarEnCamino()"
+        style="width:100%;padding:.85rem;margin-bottom:.6rem;border:none;border-radius:12px;
+               background:linear-gradient(135deg,#3B82F6,#2563EB);color:#fff;
+               font-family:inherit;font-size:.95rem;font-weight:800;cursor:pointer;">
+        🛵 Marcar "En camino" (avisar al cliente)
+    </button>
+
+    <a class="btn-navegar" id="ve-navegar" href="#" target="_blank" rel="noopener">🧭 Navegar con Google Maps (voz)</a>
+
+    <!-- Zona de cobro (cambia según estado de pago) -->
+    <div id="ve-cobro-zona">
+      <div class="cobro-titulo">💵 Cobrar al cliente</div>
+      <div class="cobro-grid">
+        <button class="cobro-btn efectivo" onclick="cobrarEntrega('Efectivo')">💵<span>Efectivo</span></button>
+        <button class="cobro-btn tarjeta" onclick="cobrarEntrega('Tarjeta')">💳<span>Tarjeta</span></button>
+        <button class="cobro-btn zelle" onclick="cobrarEntrega('Zelle')">🟣<span>Zelle</span></button>
+        <button class="cobro-btn cashapp" onclick="cobrarEntrega('Cash App')">🟢<span>Cash App</span></button>
+        <button class="cobro-btn venmo" onclick="cobrarEntrega('Venmo')">🔵<span>Venmo</span></button>
+      </div>
+    </div>
+
+    <div id="ve-pagado-zona" style="display:none;">
+      <div class="ve-pagado" id="ve-pagado-txt">✅ Pagado</div>
+    </div>
+
+    <button id="ve-btn-entregado" onclick="marcarEntregado()"
+        style="width:100%;padding:.9rem;margin-top:.8rem;border:none;border-radius:12px;
+               background:linear-gradient(135deg,#25D366,#1DA851);color:#fff;
+               font-family:inherit;font-size:1rem;font-weight:800;cursor:pointer;">
+        🎉 Marcar Entregado
+    </button>
+  </div>
+</div>
+
+<script src="../js/tt-alert.js"></script>
+<script src="../js/estados.js?v=1788145000"></script>
+<script type="module">
+import { db } from '../js/firebase-config.js';
+import { collection, onSnapshot, doc, updateDoc, setDoc, serverTimestamp, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// Guarda los pedidos actuales para abrirlos en la vista de entrega
+let _pedidosActuales = [];
+let _mapaLeaflet = null;
+let _pedidoAbierto = null;
+
+function _leer(clave) {
+    return sessionStorage.getItem(clave) || localStorage.getItem(clave);
+}
+
+// Identidad del repartidor (viene del login por PIN de empleado)
+const miId     = (_leer('tt_emp_id') || _leer('tt_cajero_id') || '').trim();
+const miNombre = (_leer('tt_emp_nombre') || _leer('tt_cajero_nombre') || '').trim();
+const miRol    = (_leer('tt_emp_rol') || _leer('tt_cajero_rol') || '').toLowerCase();
+
+// ── Compartir ubicación del tortumóvil en vivo ──────────────────
+// El repartidor comparte su posición GPS mientras usa Mi Ruta, para que
+// el panel admin pueda ver dónde está cada tortumóvil en tiempo real.
+// Se guarda en la colección "ubicaciones" con el id del repartidor.
+let _watchId = null;
+let _ultimoGuardado = 0;
+let _miPosActual = null; // posición actual del repartidor para calcular distancia
+
+function _distanciaMillasRuta(lat1, lng1, lat2, lng2) {
+    const R = 3958.8;
+    const dLat = (lat2-lat1) * Math.PI/180;
+    const dLng = (lng2-lng1) * Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+// Estado del compartir ubicación (para mostrar al repartidor qué está pasando)
+var _ubiEstado = 'inactivo';  // inactivo | esperando | guardando | error-gps | error-db
+
+// Guardar una posición en Firestore
+async function _guardarUbicacion(pos) {
+    _miPosActual = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    if (window.render) window.render();
+    var datos = {
+        repartidorId: String(miId),
+        nombre: miNombre || miId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        precision: pos.coords.accuracy || null,
+        actualizado: Date.now()
+    };
+    // IDs bajo los que guardar la ubicación (para que el cliente siempre encuentre al repartidor,
+    // sin importar si el pedido guardó el empleadoId o el UID de Firebase)
+    var ids = [String(miId)];
+    var uid = _leer('tt_emp_docid');
+    if (uid && ids.indexOf(uid) < 0) ids.push(uid);
+    try {
+        await Promise.all(ids.map(function(id){
+            return setDoc(doc(db, 'ubicaciones', id), datos);
+        }));
+        _ubiEstado = 'guardando';
+        _ultimoGuardado = Date.now();
+    } catch(e) {
+        console.error('Error al guardar ubicación en la base:', e);
+        _ubiEstado = 'error-db';
+    }
+    _actualizarInterruptorUbi();
+}
+
+function iniciarCompartirUbicacion() {
+    if (!navigator.geolocation || !miId) { _ubiEstado = 'error-gps'; return; }
+    if (_watchId !== null) return; // ya está activo
+    _ubiEstado = 'esperando';
+    _actualizarInterruptorUbi();
+
+    // 1) Guardar la posición AHORA MISMO (no esperar a que el repartidor se mueva)
+    navigator.geolocation.getCurrentPosition(function(pos){
+        _guardarUbicacion(pos);
+    }, function(err){
+        console.warn('GPS inicial no disponible:', err.message);
+        _ubiEstado = 'error-gps';
+        _actualizarInterruptorUbi();
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:15000 });
+
+    // 2) Seguir la posición conforme el repartidor se mueve
+    _watchId = navigator.geolocation.watchPosition(function(pos){
+        const ahora = Date.now();
+        _miPosActual = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        if (window.render) window.render();
+        // Guardar como máximo cada 5 segundos
+        if (ahora - _ultimoGuardado < 5000) return;
+        _guardarUbicacion(pos);
+    }, function(err){
+        console.warn('GPS no disponible para compartir ubicación:', err.message);
+        _ubiEstado = 'error-gps';
+        _actualizarInterruptorUbi();
+    }, { enableHighAccuracy:true, maximumAge:3000, timeout:15000 });
+}
+// Detener el seguimiento de ubicación
+function detenerCompartirUbicacion() {
+    if (_watchId !== null) {
+        navigator.geolocation.clearWatch(_watchId);
+        _watchId = null;
+    }
+}
+
+// Interruptor para activar/desactivar el compartir ubicación en tiempo real
+window.toggleCompartirUbicacion = function() {
+    var activo = (_watchId !== null);
+    if (activo) {
+        detenerCompartirUbicacion();
+        try { localStorage.setItem('tt_compartir_ubi', '0'); } catch(e){}
+    } else {
+        iniciarCompartirUbicacion();
+        try { localStorage.setItem('tt_compartir_ubi', '1'); } catch(e){}
+    }
+    _actualizarInterruptorUbi();
+};
+
+function _actualizarInterruptorUbi() {
+    var activo = (_watchId !== null);
+    var cont = document.getElementById('ubi-toggle-cont');
+    if (!cont) return;
+
+    // Determinar icono, color y mensaje según el estado real
+    var icono, color, titulo, detalle;
+    if (!activo) {
+        icono = '📴'; color = '#888';
+        titulo = 'Ubicación desactivada';
+        detalle = 'Actívala para que el cliente te siga';
+    } else if (_ubiEstado === 'guardando') {
+        icono = '📡'; color = '#25D366';
+        titulo = 'Compartiendo ubicación ✓';
+        detalle = 'El cliente ve tu tortumóvil en tiempo real';
+    } else if (_ubiEstado === 'esperando') {
+        icono = '⏳'; color = '#FBB724';
+        titulo = 'Obteniendo tu ubicación…';
+        detalle = 'Espera un momento (asegúrate de dar permiso de GPS)';
+    } else if (_ubiEstado === 'error-gps') {
+        icono = '⚠️'; color = '#FF5A5A';
+        titulo = 'Sin acceso al GPS';
+        detalle = 'Da permiso de ubicación al navegador y toca ON de nuevo';
+    } else if (_ubiEstado === 'error-db') {
+        icono = '⚠️'; color = '#FF5A5A';
+        titulo = 'Error al guardar ubicación';
+        detalle = 'Revisa tu conexión a internet';
+    } else {
+        icono = '📡'; color = '#25D366';
+        titulo = 'Compartiendo ubicación';
+        detalle = 'El cliente ve tu tortumóvil en tiempo real';
+    }
+
+    cont.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;">' +
+            '<div style="display:flex;align-items:center;gap:.5rem;">' +
+                '<span style="font-size:1.3rem;">' + icono + '</span>' +
+                '<div>' +
+                    '<div style="font-weight:800;font-size:.9rem;color:' + color + ';">' + titulo + '</div>' +
+                    '<div style="font-size:.72rem;color:#888;">' + detalle + '</div>' +
+                '</div>' +
+            '</div>' +
+            '<button onclick="toggleCompartirUbicacion()" style="min-width:64px;height:34px;border-radius:20px;border:none;cursor:pointer;font-family:inherit;font-weight:800;font-size:.8rem;background:' +
+                (activo ? '#25D366' : 'rgba(255,255,255,.15)') + ';color:' + (activo ? '#000' : '#fff') + ';">' +
+                (activo ? 'ON' : 'OFF') + '</button>' +
+        '</div>';
+}
+
+// Arrancar automáticamente si el repartidor lo tenía activo (o por defecto ON)
+if (miId) {
+    var pref = null;
+    try { pref = localStorage.getItem('tt_compartir_ubi'); } catch(e){}
+    if (pref !== '0') { iniciarCompartirUbicacion(); }  // por defecto activo
+    setTimeout(_actualizarInterruptorUbi, 500);
+}
+
+// ── Menú de navegación ──
+window.toggleNavMenu = function() {
+    const ov = document.getElementById('nav-menu-overlay');
+    const abierto = ov.style.display === 'block';
+    if (!abierto) construirNavMenu();
+    ov.style.display = abierto ? 'none' : 'block';
+};
+function construirNavMenu() {
+    const esGerente = /gerente|supervisor|admin|dueñ/.test(miRol);
+    const items = [
+        ['🏪','Tienda (Ordenar)','../ordenar.html', false],
+        ['🍳','Cocina','cocina.html', false],
+        ['🛵','Mi Ruta','mi-ruta.html', false],
+        ['🔔','Pedidos Disponibles','disponibles.html', false],
+        ['📊','Reportes','reportes.html', true],
+        ['⚙️','Panel Admin','admin.html', true],
+        ['🧑‍💼','Panel Empleado','empleados.html', false],
+    ];
+    var _navCont = document.getElementById('nav-menu-items');
+    if (!_navCont) return; // menú propio removido, ahora usa barra compartida
+    _navCont.innerHTML = items.map(function(it){
+        if (it[3] && !esGerente) return '';
+        return '<a href="'+it[2]+'" style="display:flex;align-items:center;gap:.8rem;padding:.9rem 1.1rem;'+
+            'color:#eee;text-decoration:none;font-size:.92rem;font-weight:600;border-bottom:1px solid rgba(255,255,255,.05);">'+
+            '<span style="font-size:1.2rem;width:26px;text-align:center;">'+it[0]+'</span>'+it[1]+'</a>';
+    }).join('');
+}
+
+// Si no hay sesión de empleado, mandar a entrar
+if (!miId && !miNombre) {
+    document.getElementById('lista-ruta').innerHTML =
+        '<div class="vacio"><div class="emo">🔒</div>Necesitas entrar con tu PIN de empleado para ver tu ruta.' +
+        '<br><br><a href="bienvenida.html" style="color:#FF5A00;font-weight:700;">Ir a entrar</a></div>';
+} else {
+    document.getElementById('rep-nombre').textContent = miNombre || miId;
+    escucharRuta();
+}
+
+// ¿Este pedido es de este repartidor?
+function _fechaIngreso(p) {
+    var ts = null;
+    if (p.creado && p.creado.seconds) ts = p.creado.seconds * 1000;
+    else if (p.tiempos && p.tiempos.recibida) ts = p.tiempos.recibida;
+    else if (p.tomadaEn) ts = new Date(p.tomadaEn).getTime();
+    if (!ts) return '';
+    var d = new Date(ts);
+    return d.toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function esMiPedido(p) {
+    if (p.repartidorId && miId && p.repartidorId === miId) return true;
+    // Respaldo por nombre (por si el id no coincide exactamente)
+    if (p.repartidorNombre && miNombre &&
+        p.repartidorNombre.trim().toLowerCase() === miNombre.toLowerCase()) return true;
+    return false;
+}
+
+// ── FILTRO POR REPARTIDOR ──
+var _filtroRepActual = '__mias__';
+function _esJefeRuta() {
+    var r = (miRol || '').toLowerCase();
+    return r.indexOf('gerente') >= 0 || r.indexOf('supervisor') >= 0;
+}
+function _filtrarPedidosRuta(todos) {
+    // Si no es jefe, siempre solo las suyas
+    if (!_esJefeRuta()) return todos.filter(esMiPedido);
+    if (_filtroRepActual === '__todas__') return todos.slice();
+    if (_filtroRepActual === '__mias__') return todos.filter(esMiPedido);
+    // Filtrar por un repartidor específico (por NOMBRE normalizado)
+    var objetivo = String(_filtroRepActual || '').trim().toLowerCase();
+    return todos.filter(function(p){
+        var nom = (p.repartidorNombre || p.repartidorId || '').trim().toLowerCase();
+        return nom === objetivo;
+    });
+}
+var _filtroOpcionesFirma = '';
+function _poblarFiltroRepartidores() {
+    var wrap = document.getElementById('filtro-rep-wrap');
+    var sel = document.getElementById('filtro-rep');
+    if (!wrap || !sel) return;
+    // Mostrar el filtro solo para gerente/supervisor
+    if (!_esJefeRuta()) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    // Obtener repartidores únicos POR NOMBRE (evita duplicados si el mismo
+    // repartidor tiene IDs distintos en diferentes órdenes).
+    var vistos = {};
+    var reps = [];
+    (window._todosPedidosRuta || []).forEach(function(p){
+        var nom = (p.repartidorNombre || '').trim();
+        if (!nom && p.repartidorId) nom = String(p.repartidorId).trim();
+        if (!nom) return;
+        var clave = nom.toLowerCase();
+        if (!vistos[clave]) {
+            vistos[clave] = true;
+            reps.push({ id: nom, nombre: nom });  // filtramos por nombre
+        }
+    });
+    reps.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+    // Firma de las opciones actuales — solo reconstruir el <select> si CAMBIÓ.
+    // Así no interferimos con la selección del usuario en cada snapshot.
+    var firma = reps.map(function(r){ return r.id + ':' + r.nombre; }).join('|');
+    if (firma === _filtroOpcionesFirma) return; // sin cambios, no tocar el select
+    _filtroOpcionesFirma = firma;
+    var html = '<option value="__mias__">Mis órdenes</option><option value="__todas__">Todas las órdenes</option>';
+    reps.forEach(function(r){
+        html += '<option value="' + r.id + '">🛵 ' + r.nombre + '</option>';
+    });
+    sel.innerHTML = html;
+    // Conservar la selección actual del filtro (variable, no el DOM)
+    sel.value = _filtroRepActual || '__mias__';
+    if (!sel.value) sel.value = '__mias__';
+}
+window.aplicarFiltroRep = function() {
+    var sel = document.getElementById('filtro-rep');
+    _filtroRepActual = sel ? sel.value : '__mias__';
+    var lista = _filtrarPedidosRuta(window._todosPedidosRuta || []);
+    _pedidosActuales = lista;
+    render(lista);
+    // Refrescar el resumen (contadores) si existe la función
+    try { if (typeof actualizarResumen === 'function') actualizarResumen(lista); } catch(e){}
+};
+
+function metodoPagoInfo(p) {
+    const m = (p.metodoPagoReal || p.metodoPago || '').toLowerCase();
+    if (!p.estadoPago || p.estadoPago !== 'Pagado') {
+        // Aún no pagado: si es domicilio, probablemente cobra el repartidor
+        if (m.includes('efectivo')) return { txt:'💵 Cobrar EFECTIVO', clase:'pago-efectivo' };
+        return { txt:'Pendiente de pago', clase:'pago-pend' };
+    }
+    if (m.includes('efectivo')) return { txt:'💵 Efectivo', clase:'pago-efectivo' };
+    if (m) return { txt:'✅ Pagado ('+ (p.metodoPagoReal||p.metodoPago) +')', clase:'pago-digital' };
+    return { txt:'✅ Pagado', clase:'pago-digital' };
+}
+
+function render(pedidos) {
+    const cont = document.getElementById('lista-ruta');
+    const resumen = document.getElementById('resumen');
+
+    if (!pedidos.length) {
+        resumen.style.display = 'none';
+        cont.innerHTML = '<div class="vacio"><div class="emo">✅</div>No tienes pedidos asignados por ahora.<br>Cuando el admin te asigne entregas, aparecerán aquí.</div>';
+        return;
+    }
+
+    // Pendientes primero, entregados al final
+    pedidos.sort((a,b) => {
+        const ea = a.entregado ? 1 : 0, eb = b.entregado ? 1 : 0;
+        if (ea !== eb) return ea - eb;
+        return (a.folio||0) - (b.folio||0);
+    });
+
+    let pend = 0, hechas = 0, efectivo = 0;
+    pedidos.forEach(p => {
+        if (p.entregado) hechas++; else pend++;
+        const m = (p.metodoPagoReal || p.metodoPago || '').toLowerCase();
+        if (!p.entregado && m.includes('efectivo') && p.estadoPago !== 'Pagado') {
+            efectivo += Number(p.totalNum) || parseFloat(String(p.total).replace(/[^0-9.]/g,'')) || 0;
+        }
+    });
+    document.getElementById('r-pend').textContent = pend;
+    document.getElementById('r-hechas').textContent = hechas;
+    document.getElementById('r-efectivo').textContent = '$' + efectivo.toFixed(0);
+    resumen.style.display = 'flex';
+
+    cont.innerHTML = pedidos.map(p => {
+        const pago = metodoPagoInfo(p);
+        const folio = p.codigoOrden || (p.id ? p.id.slice(-4).toUpperCase() : (p.folioStr||''));
+        const dir = p.ubicacionCliente && p.ubicacionCliente.direccion ? p.ubicacionCliente.direccion : '';
+        const lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+        const lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+        const mapsUrl = (lat && lng) ? 'https://www.google.com/maps?q='+lat+','+lng
+                        : (dir ? 'https://www.google.com/maps/search/'+encodeURIComponent(dir) : '');
+        var itemsTxt;
+        if (Array.isArray(p.itemsData) && p.itemsData.length && window.agruparItems) {
+            itemsTxt = window.agruparItems(p.itemsData).map(function(g){
+                return g.cantidad + '× ' + (g.nombre||'Producto') + (g.variante ? ' ('+g.variante+')' : '');
+            });
+        } else {
+            itemsTxt = (typeof p.items === 'string' ? p.items : '').split(' | ').filter(Boolean);
+        }
+
+        return '<div class="pedido-card '+(p.entregado?'entregado':'')+'">' +
+            '<div class="pc-top">' +
+              '<div><div class="pc-cliente">'+(p.cliente||p.nombre||'Cliente')+'</div>' +
+              '<div class="pc-folio">Orden #'+folio+(p.zonaEntregaNombre?(' · '+p.zonaEntregaNombre):'')+(_fechaIngreso(p)?(' · 🕐 '+_fechaIngreso(p)):'')+'</div></div>' +
+              '<div class="pc-total">'+(p.total||'')+'</div>' +
+            '</div>' +
+            (p.telefono ? '<div class="pc-linea">📞 <a href="tel:'+p.telefono+'" style="color:#5B9BFF;">'+p.telefono+'</a></div>' : '') +
+            (dir ? '<div class="pc-linea">📍 '+dir+'</div>' : '') +
+            (p.horarioEntregaEtiqueta ? '<div class="pc-linea">🕐 '+p.horarioEntregaEtiqueta+'</div>' : '') +
+            (itemsTxt.length ? '<div class="pc-linea" style="flex-direction:column;gap:.1rem;margin-top:.4rem;text-align:center;align-items:center;">'+
+                itemsTxt.map(function(it){ return '<div>• '+it+'</div>'; }).join('')+'</div>' : '') +
+            '<div style="text-align:center;margin:.4rem 0;"><span class="pc-pago '+pago.clase+'">'+pago.txt+'</span></div>' +
+            // Botón pedir ubicación (solo si el cliente aún no la compartió)
+            ((!lat || !lng) ?
+              '<button class="btn-pedir-ubi" style="width:100%;border:1px solid rgba(255,90,0,.4);' +
+              'background:rgba(255,90,0,.12);color:#FF7A33;border-radius:10px;padding:.7rem;' +
+              'font-weight:700;font-size:.85rem;cursor:pointer;margin-bottom:.5rem;font-family:inherit;" ' +
+              'onclick="pedirUbicacionRuta(\''+p.id+'\',\''+(p.telefono||'')+'\',\''+String(p.cliente||p.nombre||'').replace(/\'/g,'')+'\')">' +
+              '📍 Pedir ubicación al cliente</button>'
+              :
+              '<div style="text-align:center;font-size:.75rem;color:#25D366;margin-bottom:.5rem;font-weight:600;">✅ Cliente compartió su ubicación</div>'
+            ) +
+            '<button class="btn-maps" style="width:100%;border:1px solid rgba(66,133,244,.4);cursor:pointer;" onclick="abrirEntrega(\''+p.id+'\')">🗺️ Cómo llegar y cobrar</button>' +
+            '<button onclick="enviarTicketWA(\''+p.id+'\')" style="width:100%;margin-top:.5rem;padding:.55rem;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);color:#25D366;border-radius:8px;font-family:inherit;font-weight:700;font-size:.8rem;cursor:pointer;">📱 Enviar ticket por WhatsApp</button>' +
+            (p.fotoReferencia ? '<button onclick="_toggleFotoRuta(\''+p.id+'\')" style="width:100%;margin-top:.5rem;padding:.55rem;background:rgba(91,155,255,.12);border:1px solid rgba(91,155,255,.35);color:#5B9BFF;border-radius:8px;font-family:inherit;font-weight:700;font-size:.8rem;cursor:pointer;">📸 <span id="fotor-txt-'+p.id+'">Ver foto de referencia</span></button><div id="fotor-cont-'+p.id+'" style="display:none;margin-top:.5rem;"><img src="'+p.fotoReferencia+'" style="width:100%;border-radius:8px;" onclick="window.open(this.src)"></div>' : '') +
+
+            // ── Estado de la orden + repartidor + cliente ──
+            '<div style="margin-top:.7rem;padding-top:.7rem;border-top:1px solid rgba(255,255,255,.08);font-size:.8rem;line-height:1.7;">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                '<span style="color:#888;">Estado:</span>' +
+                '<span style="font-weight:800;color:' + (p.entregado ? '#25D366' : '#FFC107') + ';">' +
+                  (p.entregado ? '✅ Entregado' : (p.estado || 'Pendiente')) + '</span>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;">' +
+                '<span style="color:#888;">Cliente:</span>' +
+                '<span style="font-weight:700;color:#eee;">' + (p.cliente||p.nombre||'—') + '</span>' +
+              '</div>' +
+              '<div style="display:flex;justify-content:space-between;">' +
+                '<span style="color:#888;">Repartidor:</span>' +
+                '<span style="font-weight:700;color:' + (p.repartidorNombre ? '#5B9BFF' : '#888') + ';">' +
+                  '🛵 ' + (p.repartidorNombre || 'Sin asignar') + '</span>' +
+              '</div>' +
+              // Distancia al cliente (si tenemos ambas posiciones)
+              ((_miPosActual && lat && lng)
+                ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:.3rem;padding-top:.3rem;border-top:1px dashed rgba(255,255,255,.1);">' +
+                    '<span style="color:#888;">Distancia:</span>' +
+                    '<span style="font-weight:900;color:#FF7A33;font-size:.95rem;">📍 ' +
+                    _distanciaMillasRuta(_miPosActual.lat, _miPosActual.lng, lat, lng).toFixed(1) + ' millas</span>' +
+                  '</div>'
+                : (lat && lng
+                    ? '<div style="font-size:.72rem;color:#888;margin-top:.3rem;text-align:center;">Activa tu GPS para ver la distancia al cliente</div>'
+                    : '')
+              ) +
+            '</div>' +
+
+            // ── Botón TOMAR ORDEN (solo si es solicitud sin productos) ──
+            (p.esSolicitudUnidad
+                ? '<button onclick="tomarOrdenPorCliente(\''+p.id+'\')" ' +
+                  'style="width:100%;margin-top:.7rem;padding:.8rem;border:none;border-radius:10px;' +
+                  'background:linear-gradient(135deg,#FF7A33,#FF5A00);color:#fff;font-family:inherit;' +
+                  'font-size:.9rem;font-weight:800;cursor:pointer;box-shadow:0 4px 12px rgba(255,90,0,.3);">' +
+                  '📝 Tomar orden por el cliente</button>'
+                : '') +
+
+            // ── Botón CAMBIAR/ASIGNAR repartidor ──
+            '<button onclick="cambiarRepartidorRuta(\''+p.id+'\',\''+String(p.cliente||p.nombre||'').replace(/\x27/g,'')+'\')" ' +
+            'style="width:100%;margin-top:.5rem;padding:.75rem;border:1px solid rgba(91,155,255,.4);' +
+            'background:rgba(91,155,255,.12);color:#5B9BFF;border-radius:10px;font-family:inherit;' +
+            'font-weight:700;font-size:.85rem;cursor:pointer;">🛵 Cambiar repartidor</button>' +
+
+            // ── Botón marcar entregado (o sello si ya está entregado) ──
+            (p.entregado
+              ? '<div style="margin-top:.7rem;text-align:center;background:rgba(37,211,102,.12);' +
+                'border:1px solid rgba(37,211,102,.35);color:#25D366;border-radius:10px;padding:.7rem;' +
+                'font-weight:800;font-size:.9rem;">🎉 Orden Entregada</div>'
+              : '<button onclick="marcarEntregadoDirecto(\''+p.id+'\')" ' +
+                'style="width:100%;margin-top:.7rem;padding:.8rem;border:none;border-radius:10px;' +
+                'background:linear-gradient(135deg,#25D366,#1DA851);color:#fff;font-family:inherit;' +
+                'font-size:.9rem;font-weight:800;cursor:pointer;">✅ Marcar como Entregado</button>'
+            ) +
+        '</div>';
+    }).join('');
+}
+
+
+// ── PEDIR UBICACIÓN AL CLIENTE (compartir GPS) ──
+window.pedirUbicacionRuta = function(pedidoId, telefono, nombre) {
+    // Link interno de Tortas Tortuga que el cliente abre para compartir su GPS + foto
+    var base = window.location.origin + window.location.pathname.replace(/pages\/mi-ruta\.html$/, '');
+    var link = base + 'ubicacion.html?pedido=' + pedidoId;
+    _mostrarModalLinkUbicacion(link, nombre);
+};
+
+// Modal bonito con el link para copiar y compartir con el cliente
+function _mostrarModalLinkUbicacion(link, nombre) {
+    var modal = document.getElementById('link-ubi-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'link-ubi-modal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1.2rem;';
+        document.body.appendChild(modal);
+    }
+    var quien = nombre ? (' de ' + nombre) : '';
+    modal.innerHTML =
+        '<div style="background:#1a1a1a;border:1px solid rgba(255,90,0,.35);border-radius:20px;max-width:400px;width:100%;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.6);">' +
+            '<div style="background:linear-gradient(135deg,#FF7A33,#FF5A00);padding:1.2rem;text-align:center;">' +
+                '<div style="font-size:2.2rem;">📍</div>' +
+                '<div style="font-size:1.05rem;font-weight:900;color:#fff;margin-top:.2rem;">Pedir ubicación' + quien + '</div>' +
+            '</div>' +
+            '<div style="padding:1.2rem;">' +
+                '<div style="font-size:.85rem;color:#ddd;line-height:1.5;margin-bottom:.8rem;">Copia este link y mándaselo al cliente. Al abrirlo podrá compartir su ubicación exacta y una foto de referencia. Se le cobrará el envío de $5.</div>' +
+                '<div style="background:#0e0e0e;border:1px solid rgba(255,255,255,.15);border-radius:10px;padding:.7rem;font-size:.75rem;color:#5B9BFF;word-break:break-all;margin-bottom:.9rem;" id="link-ubi-texto">' + link + '</div>' +
+                '<button onclick="_copiarLinkUbi()" style="width:100%;padding:.85rem;border:none;background:linear-gradient(135deg,#25D366,#1DA851);color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.9rem;cursor:pointer;margin-bottom:.5rem;">📋 Copiar link</button>' +
+                '<button onclick="_cerrarModalLinkUbi()" style="width:100%;padding:.7rem;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#aaa;border-radius:12px;font-family:inherit;font-weight:700;font-size:.85rem;cursor:pointer;">Cerrar</button>' +
+            '</div>' +
+        '</div>';
+    modal.style.display = 'flex';
+    window._linkUbiActual = link;
+}
+
+window._copiarLinkUbi = function() {
+    var link = window._linkUbiActual || '';
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(link).then(function(){
+            mostrarToastRuta('📋 Link copiado. Compártelo con el cliente.');
+            _cerrarModalLinkUbi();
+        }).catch(function(){
+            var t = document.getElementById('link-ubi-texto');
+            if (t) { var r = document.createRange(); r.selectNode(t); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); }
+            mostrarToastRuta('Selecciona y copia el link manualmente.');
+        });
+    } else {
+        var t = document.getElementById('link-ubi-texto');
+        if (t) { var r = document.createRange(); r.selectNode(t); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); }
+    }
+};
+
+window._cerrarModalLinkUbi = function() {
+    var modal = document.getElementById('link-ubi-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+function mostrarToastRuta(txt) {
+    var toast = document.createElement('div');
+    toast.textContent = txt;
+    toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);' +
+        'background:#25D366;color:#fff;padding:.7rem 1.3rem;border-radius:20px;font-weight:700;' +
+        'z-index:99999;box-shadow:0 4px 16px rgba(0,0,0,.4);font-family:system-ui,sans-serif;max-width:90%;text-align:center;';
+    document.body.appendChild(toast);
+    setTimeout(function(){ toast.remove(); }, 2500);
+}
+
+function escucharRuta() {
+    onSnapshot(collection(db, 'pedidos'), snap => {
+      try {
+        const todos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        window._todosPedidosRuta = todos.filter(p => p.archivado !== true);
+        // Poblar el filtro de repartidores (solo gerente/supervisor)
+        _poblarFiltroRepartidores();
+        // Aplicar el filtro seleccionado
+        const mios = _filtrarPedidosRuta(window._todosPedidosRuta);
+        _pedidosActuales = mios;
+        render(mios);
+      } catch(errRender) {
+        console.error('Error al mostrar la ruta:', errRender);
+        var c = document.getElementById('lista-ruta');
+        if (c) c.innerHTML = '<div style="padding:1rem;color:#FF8888;">Hubo un problema al cargar la ruta. Detalle: ' + (errRender.message||errRender) + '</div>';
+      }
+        // Si hay una entrega abierta, refrescar su estado de pago en vivo
+        if (_pedidoAbierto) {
+            const actualizado = mios.find(x => x.id === _pedidoAbierto.id);
+            if (actualizado) { _pedidoAbierto = actualizado; refrescarZonaCobro(actualizado); }
+        }
+    }, err => {
+        document.getElementById('lista-ruta').innerHTML =
+            '<div class="vacio"><div class="emo">⚠️</div>No se pudo cargar tu ruta. Revisa tu conexión.</div>';
+    });
+}
+
+// ── VISTA DE ENTREGA (mapa + orden + cobro) ──────────────────
+// ── Enviar ticket por WhatsApp ──
+window.enviarTicketWA = function(pedidoId) {
+    var p = _pedidosActuales.find(function(x){ return x.id === pedidoId; });
+    if (!p) { alert('No se encontró el pedido.'); return; }
+    var tel = String(p.telefono || '').replace(/[^0-9]/g,'');
+    if (!tel) { alert('Este pedido no tiene teléfono del cliente.'); return; }
+    if (tel.length === 10) tel = '1' + tel;
+    var L = [];
+    L.push('🐢 *TORTAS TORTUGA*');
+    L.push('━━━━━━━━━━━━━');
+    L.push('Pedido ' + (p.folioStr || ('#'+(p.folio||''))));
+    if (p.cliente || p.nombre) L.push('Cliente: ' + (p.cliente || p.nombre));
+    L.push('');
+    L.push('🛍️ *Tu orden:*');
+    var items = p.itemsData;
+    if (Array.isArray(items) && items.length) {
+        var grupos = window.agruparItems ? window.agruparItems(items) : items.map(function(i){ i.cantidad=i.cantidad||1; return i; });
+        grupos.forEach(function(g){
+            L.push('• ' + g.cantidad + '× ' + g.nombre + (g.variante ? ' ('+g.variante+')' : '') + (g.precio ? ' — $' + g.precio.toFixed(2) : ''));
+        });
+    } else if (typeof p.items === 'string' && p.items.indexOf('Pendiente') < 0) {
+        L.push('• ' + p.items);
+    } else {
+        L.push('• (Orden por definir)');
+    }
+    L.push('');
+    L.push('━━━━━━━━━━━━━');
+    if (p.cargoServicio) L.push('🛵 Envío: $' + Number(p.cargoServicio).toFixed(2));
+    L.push('💵 *Total: ' + (p.total || '$0.00') + '*');
+    L.push(p.estadoPago === 'Pagado' ? '✅ Pagado' : '⏳ Por pagar');
+    L.push('');
+    L.push('¡Gracias por tu compra! 🐢');
+    var url = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(L.join('\n'));
+    window.open(url, '_blank');
+};
+
+window.abrirEntrega = function(pedidoId) {
+    const p = _pedidosActuales.find(x => x.id === pedidoId);
+    if (!p) return;
+    _pedidoAbierto = p;
+
+    const folio = p.folioStr || (p.id ? p.id.slice(-4).toUpperCase() : '');
+    const dir = p.ubicacionCliente && p.ubicacionCliente.direccion ? p.ubicacionCliente.direccion : '';
+    const lat = p.ubicacionCliente && p.ubicacionCliente.lat;
+    const lng = p.ubicacionCliente && p.ubicacionCliente.lng;
+
+    document.getElementById('ve-cliente').textContent = p.cliente || p.nombre || 'Cliente';
+    document.getElementById('ve-folio').textContent = 'Orden #' + folio + (p.zonaEntregaNombre ? (' · ' + p.zonaEntregaNombre) : '');
+    document.getElementById('ve-dir').textContent = dir || 'Sin dirección';
+    document.getElementById('ve-dir-row').style.display = dir ? 'flex' : 'none';
+    document.getElementById('ve-tel').innerHTML = p.telefono ? '<a href="tel:'+p.telefono+'" style="color:#5B9BFF;">'+p.telefono+'</a>' : '—';
+    document.getElementById('ve-tel-row').style.display = p.telefono ? 'flex' : 'none';
+    document.getElementById('ve-hora').textContent = p.horarioEntregaEtiqueta || '—';
+    document.getElementById('ve-hora-row').style.display = p.horarioEntregaEtiqueta ? 'flex' : 'none';
+    document.getElementById('ve-total').textContent = p.total || '$0.00';
+
+    const itemsTxt = (typeof p.items === 'string' ? p.items : '').split(' | ').filter(Boolean);
+    document.getElementById('ve-items').innerHTML = itemsTxt.length
+        ? itemsTxt.map(function(it){ return '<div>• '+it+'</div>'; }).join('')
+        : '';
+
+    // Botón de navegación externa (por si quiere voz)
+    const navBtn = document.getElementById('ve-navegar');
+    if (lat && lng) navBtn.href = 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
+    else if (dir) navBtn.href = 'https://www.google.com/maps/search/' + encodeURIComponent(dir);
+    else navBtn.style.display = 'none';
+
+    refrescarZonaCobro(p);
+
+    document.getElementById('vista-entrega').classList.add('abierta');
+
+    // Inicializar el mapa después de que la vista sea visible
+    setTimeout(function(){ initMapaEntrega(lat, lng, p.cliente || 'Cliente', dir); }, 100);
+};
+
+window.cerrarEntrega = function() {
+    document.getElementById('vista-entrega').classList.remove('abierta');
+    _pedidoAbierto = null;
+    if (_mapaLeaflet) { _mapaLeaflet.remove(); _mapaLeaflet = null; }
+};
+
+function initMapaEntrega(lat, lng, nombre, dir) {
+    const cont = document.getElementById('mapa-entrega');
+    if (_mapaLeaflet) { _mapaLeaflet.remove(); _mapaLeaflet = null; }
+
+    if (!lat || !lng) {
+        cont.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:.85rem;text-align:center;padding:1rem;">Este pedido no tiene ubicación GPS.<br>Usa la dirección y el botón de navegar.</div>';
+        return;
+    }
+    cont.innerHTML = '';
+
+    _mapaLeaflet = L.map('mapa-entrega').setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    }).addTo(_mapaLeaflet);
+
+    // Pin del cliente
+    L.marker([lat, lng]).addTo(_mapaLeaflet)
+        .bindPopup('<b>' + nombre + '</b>' + (dir ? '<br>' + dir : ''))
+        .openPopup();
+
+    // Intentar ubicar al repartidor y dibujar la ruta (línea recta)
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(pos){
+            const rlat = pos.coords.latitude, rlng = pos.coords.longitude;
+            const yo = L.circleMarker([rlat, rlng], { radius:8, color:'#FF5A00', fillColor:'#FF5A00', fillOpacity:1 }).addTo(_mapaLeaflet);
+            yo.bindPopup('Tú estás aquí');
+            // Línea entre repartidor y cliente
+            L.polyline([[rlat, rlng], [lat, lng]], { color:'#FF5A00', weight:3, dashArray:'6,8' }).addTo(_mapaLeaflet);
+            // Ajustar el mapa para ver ambos puntos
+            _mapaLeaflet.fitBounds([[rlat, rlng], [lat, lng]], { padding:[50,50] });
+        }, function(){ /* sin permiso GPS: solo mostramos al cliente */ }, { enableHighAccuracy:true, timeout:8000 });
+    }
+    // Forzar recálculo de tamaño (Leaflet a veces lo necesita)
+    setTimeout(function(){ if(_mapaLeaflet) _mapaLeaflet.invalidateSize(); }, 200);
+}
+
+// Muestra botones de cobro o el estado "pagado" según corresponda
+function refrescarZonaCobro(p) {
+    const cobroZona = document.getElementById('ve-cobro-zona');
+    const pagadoZona = document.getElementById('ve-pagado-zona');
+    if (p.estadoPago === 'Pagado') {
+        cobroZona.style.display = 'none';
+        pagadoZona.style.display = 'block';
+        document.getElementById('ve-pagado-txt').textContent =
+            '✅ Pagado' + (p.metodoPagoReal ? ' con ' + p.metodoPagoReal : '');
+    } else {
+        cobroZona.style.display = 'block';
+        pagadoZona.style.display = 'none';
+    }
+}
+
+// Procesa el cobro (mismo patrón que el admin)
+window.marcarEnCamino = async function() {
+    if (!_pedidoAbierto) return;
+    try {
+        await updateDoc(doc(db, 'pedidos', _pedidoAbierto.id), {
+            estado: TTEstados.ESTADOS.EN_CAMINO.etiqueta,
+            'tiempos.enCamino': Date.now()
+        });
+        if (window.ttAlert) window.ttAlert('🛵 Marcado en camino. El cliente ya puede verlo.');
+        // Ocultar el botón para no marcarlo dos veces
+        var btn = document.getElementById('ve-btn-camino');
+        if (btn) { btn.textContent = '✅ Vas en camino'; btn.style.opacity = '.6'; btn.disabled = true; }
+    } catch(err) {
+        alert('Error al marcar en camino. Revisa tu conexión.');
+    }
+};
+
+window.cobrarEntrega = async function(metodo) {
+    if (!_pedidoAbierto) return;
+    const confirmar = window.ttConfirm
+        ? await window.ttConfirm('¿Confirmar cobro de ' + (_pedidoAbierto.total||'') + ' con ' + metodo + '?')
+        : confirm('¿Confirmar cobro con ' + metodo + '?');
+    if (!confirmar) return;
+    try {
+        await updateDoc(doc(db, 'pedidos', _pedidoAbierto.id), {
+            estadoPago: 'Pagado',
+            metodoPagoReal: metodo,
+            cobradoPor: miNombre || miId,
+            cobradoEn: new Date().toISOString()
+        });
+        // El onSnapshot refrescará la zona de cobro automáticamente
+        if (window.ttAlert) window.ttAlert('✅ Cobro registrado: ' + metodo);
+    } catch(err) {
+        alert('Error al registrar el cobro. Revisa tu conexión.');
+    }
+};
+
+// El REPARTIDOR marca la orden como Entregada (cierra su parte del flujo)
+// ── TOMAR ORDEN POR EL CLIENTE (abre el menú con datos precargados) ──
+window.tomarOrdenPorCliente = function(pedidoId) {
+    var base = location.pathname.replace(/[^\/]*$/, '');  // .../pages/
+    var url = base + '../ordenar.html?solicitud=' + encodeURIComponent(pedidoId);
+    window.location.href = url;
+};
+
+// ── CAMBIAR / ASIGNAR repartidor ──
+window.cambiarRepartidorRuta = async function(pedidoId, clienteNombre) {
+    var modal = document.getElementById('rep-modal-tt');
+    var lista = document.getElementById('rep-modal-lista');
+    var cliEl = document.getElementById('rep-modal-cliente');
+    if (cliEl) cliEl.textContent = 'Orden de: ' + (clienteNombre || 'cliente');
+    if (modal) modal.style.display = 'flex';
+    if (lista) lista.innerHTML = '<div style="color:#888;text-align:center;padding:1rem;">Cargando repartidores…</div>';
+    window._repPedidoIdTT = pedidoId;
+    try {
+        var snap = await getDocs(collection(db, 'empleados'));
+        var reps = [];
+        snap.forEach(function(d){ var e = d.data(); e._docId = d.id; reps.push(e); });
+        if (!reps.length) {
+            if (lista) lista.innerHTML = '<div style="color:#888;text-align:center;padding:1rem;">No hay repartidores registrados.</div>';
+            return;
+        }
+        var html = '';
+        reps.forEach(function(r){
+            var repId = r.empleadoId || r.id || r._docId;
+            var repNom = r.nombre || repId;
+            var rol = r.rol || '';
+            var inicial = (repNom.charAt(0) || '?').toUpperCase();
+            html += '<button onclick="_seleccionarRepTT(\'' + String(repId).replace(/\x27/g,'') + '\',\'' + String(repNom).replace(/\x27/g,'') + '\')" ' +
+                'style="width:100%;display:flex;align-items:center;gap:.8rem;padding:.8rem;margin-bottom:.5rem;' +
+                'background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:14px;' +
+                'cursor:pointer;font-family:inherit;text-align:left;transition:all .15s;" ' +
+                'onmouseover="this.style.background=\'rgba(255,90,0,.12)\';this.style.borderColor=\'rgba(255,90,0,.4)\'" ' +
+                'onmouseout="this.style.background=\'rgba(255,255,255,.04)\';this.style.borderColor=\'rgba(255,255,255,.1)\'">' +
+                '<div style="width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#FF7A33,#FF5A00);' +
+                'display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;color:#fff;flex-shrink:0;">' + inicial + '</div>' +
+                '<div style="flex:1;min-width:0;">' +
+                '<div style="font-size:.95rem;font-weight:800;color:#fff;">🛵 ' + repNom + '</div>' +
+                (rol ? '<div style="font-size:.78rem;color:#888;">' + rol + '</div>' : '') +
+                '</div>' +
+                '<div style="color:#FF7A33;font-size:1.2rem;">›</div>' +
+                '</button>';
+        });
+        if (lista) lista.innerHTML = html;
+    } catch(e) {
+        console.error(e);
+        if (lista) lista.innerHTML = '<div style="color:#F44336;text-align:center;padding:1rem;">Error al cargar. Intenta de nuevo.</div>';
+    }
+};
+
+// Cerrar el modal
+window.cerrarRepModalTT = function() {
+    var modal = document.getElementById('rep-modal-tt');
+    if (modal) modal.style.display = 'none';
+};
+
+// Seleccionar un repartidor del modal
+window._toggleFotoRuta = function(pid) {
+    var cont = document.getElementById('fotor-cont-' + pid);
+    var txt = document.getElementById('fotor-txt-' + pid);
+    var icon = document.getElementById('fotor-icon-' + pid);
+    if (!cont) return;
+    if (cont.style.display === 'none') {
+        cont.style.display = 'block';
+        if (txt) txt.textContent = 'Ocultar foto';
+        if (icon) icon.textContent = '🔽';
+    } else {
+        cont.style.display = 'none';
+        if (txt) txt.textContent = 'Ver foto de referencia';
+        if (icon) icon.textContent = '📸';
+    }
+};
+
+window._seleccionarRepTT = function(repId, repNom) {
+    var pedidoId = window._repPedidoIdTT;
+    if (!pedidoId) return;
+    // Mostrar confirmación bonita antes de reasignar
+    _mostrarConfirmacionRep(repId, repNom);
+};
+
+// Modal de confirmación estilo Tortas Tortuga
+function _mostrarConfirmacionRep(repId, repNom) {
+    var conf = document.getElementById('rep-confirm-tt');
+    if (!conf) {
+        conf = document.createElement('div');
+        conf.id = 'rep-confirm-tt';
+        conf.style.cssText = 'position:fixed;inset:0;z-index:10002;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1.2rem;';
+        document.body.appendChild(conf);
+    }
+    conf.innerHTML =
+        '<div style="background:#1a1a1a;border:1px solid rgba(255,90,0,.35);border-radius:20px;max-width:380px;width:100%;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.6);">' +
+            '<div style="background:linear-gradient(135deg,#FF7A33,#FF5A00);padding:1.3rem 1.2rem;text-align:center;">' +
+                '<div style="font-size:2.5rem;margin-bottom:.3rem;">🛵</div>' +
+                '<div style="font-size:1.1rem;font-weight:900;color:#fff;">¿Pasar esta orden?</div>' +
+            '</div>' +
+            '<div style="padding:1.3rem 1.2rem;text-align:center;">' +
+                '<div style="font-size:.95rem;color:#ddd;line-height:1.5;margin-bottom:.5rem;">Estás por pasar esta orden a:</div>' +
+                '<div style="font-size:1.3rem;font-weight:900;color:#FF7A33;margin-bottom:.6rem;">' + repNom + '</div>' +
+                '<div style="font-size:.82rem;color:#888;line-height:1.4;">La orden entrará automáticamente a la cuenta de ' + repNom + ' y saldrá de la actual.</div>' +
+            '</div>' +
+            '<div style="padding:0 1.2rem 1.2rem 1.2rem;display:flex;gap:.6rem;">' +
+                '<button onclick="_cancelarConfirmRep()" style="flex:1;padding:.85rem;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#aaa;border-radius:12px;font-family:inherit;font-weight:700;font-size:.9rem;cursor:pointer;">Cancelar</button>' +
+                '<button onclick="_confirmarAsignarRep(\'' + String(repId).replace(/\x27/g,'') + '\',\'' + String(repNom).replace(/\x27/g,'') + '\')" style="flex:1;padding:.85rem;border:none;background:linear-gradient(135deg,#25D366,#1DA851);color:#fff;border-radius:12px;font-family:inherit;font-weight:800;font-size:.9rem;cursor:pointer;">✅ Sí, pasar</button>' +
+            '</div>' +
+        '</div>';
+    conf.style.display = 'flex';
+}
+
+window._cancelarConfirmRep = function() {
+    var conf = document.getElementById('rep-confirm-tt');
+    if (conf) conf.style.display = 'none';
+};
+
+window._confirmarAsignarRep = async function(repId, repNom) {
+    var pedidoId = window._repPedidoIdTT;
+    if (!pedidoId) return;
+    var conf = document.getElementById('rep-confirm-tt');
+    if (conf) conf.style.display = 'none';
+    try {
+        await updateDoc(doc(db, 'pedidos', pedidoId), {
+            repartidorId: String(repId),
+            repartidorNombre: repNom,
+            repartidorAsignadoEn: new Date().toISOString()
+        });
+        cerrarRepModalTT();
+        // Aviso visual bonito
+        var aviso = document.createElement('div');
+        aviso.style.cssText = 'position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:10001;background:linear-gradient(135deg,#25D366,#1DA851);color:#fff;padding:.8rem 1.4rem;border-radius:14px;font-weight:800;font-size:.9rem;box-shadow:0 6px 20px rgba(0,0,0,.4);';
+        aviso.textContent = '✅ Asignado a ' + repNom;
+        document.body.appendChild(aviso);
+        setTimeout(function(){ aviso.remove(); }, 2500);
+    } catch(e) {
+        console.error(e);
+        alert('No se pudo asignar. Intenta de nuevo.');
+    }
+};
+
+window.marcarEntregadoDirecto = async function(pedidoId) {
+    if (!pedidoId) return;
+    const confirmar = window.ttConfirm
+        ? await window.ttConfirm('¿Marcar esta orden como ENTREGADA?')
+        : confirm('¿Marcar como entregada?');
+    if (!confirmar) return;
+    try {
+        await updateDoc(doc(db, 'pedidos', pedidoId), {
+            estado: TTEstados.ESTADOS.ENTREGADO.etiqueta,
+            entregado: true,
+            'tiempos.entregada': Date.now()
+        });
+        if (window.ttAlert) window.ttAlert('🎉 Orden marcada como entregada.');
+    } catch(err) {
+        alert('Error al marcar entregado. Revisa tu conexión.');
+    }
+};
+
+window.marcarEntregado = async function() {
+    if (!_pedidoAbierto) return;
+    const confirmar = window.ttConfirm
+        ? await window.ttConfirm('¿Marcar esta orden como ENTREGADA?')
+        : confirm('¿Marcar como entregada?');
+    if (!confirmar) return;
+    try {
+        await updateDoc(doc(db, 'pedidos', _pedidoAbierto.id), {
+            estado: TTEstados.ESTADOS.ENTREGADO.etiqueta,
+            entregado: true,
+            'tiempos.entregada': Date.now()
+        });
+        if (window.ttAlert) window.ttAlert('🎉 Orden marcada como entregada.');
+        // Cerrar la vista de entrega
+        if (window.cerrarEntrega) window.cerrarEntrega();
+    } catch(err) {
+        alert('Error al marcar entregado. Revisa tu conexión.');
+    }
+};
+</script>
+<script src="../js/perfil-barra.js?v=1788059171"></script>
+<script type="module" src="../js/contador-disponibles.js?v=1787291222"></script>
+
+<!-- Modal de selección de repartidor (estilo Tortas Tortuga) -->
+<div id="rep-modal-tt" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:1rem;">
+  <div style="background:#1a1a1a;border:1px solid rgba(255,90,0,.3);border-radius:20px;max-width:420px;width:100%;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 12px 40px rgba(0,0,0,.6);">
+    <div style="background:linear-gradient(135deg,#FF7A33,#FF5A00);padding:1.1rem 1.2rem;">
+      <div style="font-size:1.1rem;font-weight:900;color:#fff;">🛵 Asignar repartidor</div>
+      <div id="rep-modal-cliente" style="font-size:.85rem;color:rgba(255,255,255,.9);margin-top:.2rem;">Orden de: —</div>
+    </div>
+    <div id="rep-modal-lista" style="padding:1rem;overflow-y:auto;flex:1;">
+      <div style="color:#888;text-align:center;padding:1rem;">Cargando repartidores…</div>
+    </div>
+    <div style="padding:.8rem 1rem;border-top:1px solid rgba(255,255,255,.08);">
+      <button onclick="cerrarRepModalTT()" style="width:100%;padding:.8rem;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);color:#aaa;border-radius:12px;font-family:inherit;font-weight:700;font-size:.9rem;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
