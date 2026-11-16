@@ -21,3 +21,31 @@
 #nova-enviar{width:46px;height:46px;border:none;border-radius:50%;background:#FF5A00;color:#fff;font-size:1.1rem;cursor:pointer}
 #nova-enviar:disabled{opacity:.5}
 #nova-sello:focus-visible,#nova-panel button:focus-visible,#nova-texto:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* Resumen del pedido, pago y voz */
+#nova-resumen{margin:0 .8rem .6rem;padding:.7rem .8rem;background:#0f0f0f;border:1px solid #FF5A00;border-radius:14px;font-size:.86rem;max-height:42%;overflow-y:auto;flex-shrink:0}
+#nova-resumen[hidden]{display:none}
+.nova-res-tit{display:block;color:#FF7A33;margin-bottom:.3rem}
+.nova-ren{display:flex;justify-content:space-between;gap:.6rem;padding:.12rem 0}
+.nova-ren span:last-child{white-space:nowrap}
+.nova-total{font-weight:800;font-size:1rem;border-top:1px solid #333;margin-top:.25rem;padding-top:.35rem}
+.nova-cuando{color:#ddd;padding:.2rem 0}
+.nova-falta{color:#fca5a5;padding:.2rem 0}
+#nova-resumen input{width:100%;box-sizing:border-box;margin-top:.4rem;background:#1c1c1c;border:1px solid #333;color:#fff;border-radius:10px;padding:.65rem .8rem;font-size:16px;font-family:inherit}
+#nova-programar,#nova-cashapp{display:block;width:100%;box-sizing:border-box;margin-top:.5rem;min-height:48px;border:none;border-radius:12px;background:#FF5A00;color:#fff;font-weight:800;font-size:1rem;font-family:inherit;cursor:pointer;text-align:center;text-decoration:none;line-height:48px}
+#nova-cashapp{background:#00D632;color:#000}
+#nova-programar:disabled{opacity:.6}
+#nova-qr{width:170px;height:170px;margin:.5rem auto;background:#fff;border-radius:10px;padding:6px;box-sizing:border-box}
+#nova-qr svg{width:100%;height:100%;display:block}
+#nova-voz{margin:0 .8rem .5rem;min-height:48px;border:1px solid #FF5A00;border-radius:999px;background:transparent;color:#fff;font-size:.95rem;font-weight:600;font-family:inherit;cursor:pointer;flex-shrink:0}
+#nova-voz.nova-en-llamada{background:#b91c1c;border-color:#b91c1c}
+#nova-voz.nova-oyendo{box-shadow:0 0 0 3px rgba(34,197,94,.55)}
+.nova-msg.sugerencia{border:1px dashed #FF5A00}
+#nova-mensajes{min-height:90px}
+@media (prefers-reduced-motion:no-preference){
+  .nova-respira{animation:nova-respira 1.6s ease-in-out infinite}
+  .nova-late{animation:nova-late .8s ease-in-out 3}
+  @keyframes nova-respira{50%{transform:scale(1.08)}}
+  @keyframes nova-late{50%{transform:scale(1.18)}}
+}
+#nova-resumen.nova-pago{max-height:72%}

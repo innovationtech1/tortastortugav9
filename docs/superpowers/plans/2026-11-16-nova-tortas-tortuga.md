@@ -37,32 +37,28 @@
 - [x] Probado: 8 pruebas de unidad, ruta local (403/204/400/503), panel en navegador de 390 px con servidor simulado.
 - [ ] Pendiente de Hector: publicar la rama de Studio en su versión de prueba y probar con IA real en Android.
 
-### Task 2: Voz tipo llamada
+### Task 2: Voz tipo llamada — HECHO (2026-11-16), falta probar en Android
 
-**Files:** Create `app/api/nova/tortas/voz/route.ts` (Studio; reutiliza `validarVoz`, voz «estrella», CORS de `origenPermitido`, tope propio) · Modify `js/nova.js`, `css/nova.css`.
+- [x] Studio: `app/api/nova/tortas/voz/route.ts` (voz «estrella», CORS, tope 1 cada 0.7 s y 250 pedidos / 40 000 letras al día).
+- [x] `js/nova.js`: botón «Hablar con NOVA» / «Colgar» solo si hay `SpeechRecognition`; ciclo escuchar → enviar → decir → escuchar; cuelga a los 20 s de silencio; dice la primera frase sin esperar el final; respaldo `speechSynthesis`.
+- [x] Sugerencia por inactividad (45 s, máximo 1 cada 3 min); las animaciones respetan `prefers-reduced-motion`.
+- [ ] No probado con micrófono ni audio reales (el navegador de pruebas no tiene): validar en Android.
 
-**Interfaces:** Produces `POST /api/nova/tortas/voz {text, lang}` → `audio/mpeg`. En `js/nova.js`: `NovaVoz.iniciar()`, `NovaVoz.colgar()`, `NovaVoz.decir(texto)`.
+### Task 3: Programar — HECHO (2026-11-16)
 
-- [ ] Prueba de la ruta: origen malo → 403; texto > 400 letras → 400; sin claves → 503.
-- [ ] Botón «Hablar» solo si existe `SpeechRecognition || webkitSpeechRecognition`; ciclo escuchar → enviar → decir → escuchar; cuelga a los 20 s de silencio o con «Colgar».
-- [ ] NOVA dice la primera frase en cuanto llega (cortar por `. ? !`), sin esperar la respuesta completa; si la ruta de voz falla, `speechSynthesis`.
-- [ ] Sugerencia por inactividad: 45 s con el panel abierto, máximo 1 cada 3 min, nada con `prefers-reduced-motion`.
-- [ ] Probar en navegador con servidor simulado; commit.
+- [x] `js/nova-pedido.js` + 15 pruebas; Studio acepta `contexto` (menú, zonas, días, horas) y pide la línea `PEDIDO:` (10 pruebas).
+- [x] Resumen «Tu pedido», mínimo, horario libre (con 60 min de anticipación), nombre y teléfono, «Programar» o «sí».
+- [x] Aparta el horario antes de guardar; si falla el guardado, lo libera. Probado en navegador con base de datos simulada.
+- [ ] No probado con la IA real: falta ver qué tan bien arma la línea `PEDIDO:` el modelo.
 
-### Task 3: Programar
+### Task 4: Pago — HECHO salvo el $cashtag
 
-**Files:** Create `js/nova-pedido.js` (+ `js/nova-pedido.test.mjs`, funciones puras) · Modify `lib/nova-tortas.ts` y la ruta (aceptan `menu` y `horarios` del navegador, limpios y con tope; la IA termina con una línea `PEDIDO: {json}`) · Modify `js/nova.js`.
+- [x] Pantalla de pago con QR (`js/vendor/qrcode.js`) y botón «Abrir Cash App»; sin `CASHTAG` dice «el pago se hace al recibirlo».
+- [x] Administración: no hizo falta botón nuevo; `pages/admin.html` ya trata todo lo que no es «Pagado» como pendiente y su cobro lo marca «Pagado». Falta confirmarlo en el aparato.
+- [ ] Poner el `$cashtag` de Hector en `CASHTAG`.
 
-**Interfaces:** `extraerPedido(texto) → {texto, pedido|null}` · `validarPedido(pedido, productos, zonas) → {ok, items, faltan[], errores[]}` · `calcularCobro(items) → {subtotal, envio, impuesto, total, faltaParaMinimo}` · `NOVA_REGLAS = {minimo: 60, envio: 5, impuesto: 0.04}`.
+### Pendiente antes de encender a todos los clientes
 
-- [ ] Pruebas: 5 Original C → subtotal 70, envío 5, impuesto 3.00, total 78.00; subtotal 56 → `faltaParaMinimo` 4 y no se programa; producto inexistente → error; JSON roto → `pedido: null`.
-- [ ] Tarjeta de resumen con «Programar» (o «sí» por voz); guardar con los mismos campos de `pages/programar.html` más `itemsData`, `origen: 'NOVA'`, `estadoPago: 'Pago por confirmar'`; `reservarSlot` antes de dar por hecho el horario.
-- [ ] Probar el flujo completo en navegador con Firestore simulado; commit.
-
-### Task 4: Pago
-
-**Files:** Modify `js/nova.js` (pantalla de pago: QR + «Abrir Cash App» con `https://cash.app/$CASHTAG/<total>`; QR con una librería local en `js/`) · Modify `pages/admin.html` (etiqueta y botón «Marcar pagado»).
-
-- [ ] NOVA dice «puede pagar aquí» y abre la pantalla de pago con el folio y el total.
-- [ ] «Marcar pagado» cambia `estadoPago` a `Pagado`; revisar `firestore.rules` (update de `pedidos` ya está permitido).
-- [ ] Falta el $cashtag de Hector: sin él, la pantalla de pago muestra el total y «paga al recibir».
+- [ ] Publicar la rama `nova-tortas-tortuga` de Studio en su versión de prueba y probar con IA y voz reales.
+- [ ] Confirmar la regla ($60 + $5) contra la página de inicio y corregir `index.html` (anuncia $30/$60 y productos que ya no se venden).
+- [ ] Quitar la bandera `?nova=1`.
