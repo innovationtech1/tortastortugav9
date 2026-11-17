@@ -8,7 +8,9 @@ import {
   itemsParaCocina, menuCompacto, textoVisible, validarPedido,
 } from './nova-pedido.js';
 
-const NOVA_URL = 'https://innovationtech-studio.netlify.app/api/nova/tortas';
+// Por ahora apunta a la versión de PRUEBA de Studio (rama «pruebas»). Al pasar NOVA al sitio principal de
+// Studio se cambia a https://innovationtech-studio.netlify.app/api/nova/tortas
+const NOVA_URL = 'https://pruebas--innovationtech-studio.netlify.app/api/nova/tortas';
 const FIRESTORE = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 const MAX_MENSAJES = 12;
 const SILENCIO_MS = 20000;       // la llamada se cuelga sola tras 20 s sin oír nada
